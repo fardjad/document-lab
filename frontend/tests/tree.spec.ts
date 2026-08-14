@@ -223,5 +223,16 @@ test("preserves full-image transform when selecting YAML region", async ({ page 
   await expect.poll(() => page.locator(".slice-draft > span").textContent()).not.toBe(draftSize);
   await page.getByRole("button", { name: "Cancel region" }).click();
   await expect(page.locator(".slice-draft")).toHaveCount(0);
+  await page.getByRole("button", { name: "Rename Receipt" }).click();
+  const renameInput = page.getByRole("textbox", { name: "Region name" });
+  await expect(renameInput).toBeFocused();
+  await renameInput.pressSequentially(" Renamed");
+  await expect(renameInput).toBeFocused();
+  await expect(renameInput).toHaveValue("Receipt Renamed");
+  const renameResponse = page.waitForResponse((response) => response.request().method() === "PUT" && response.url().includes("/regions/1"));
+  await renameInput.press("Enter");
+  expect((await renameResponse).status()).toBe(200);
+  const renamedRegions = await (await page.request.get("http://localhost:8000/api/projects/scan-01/regions")).json();
+  expect(renamedRegions.find((item: { id: number }) => item.id === 1).name).toBe("Receipt Renamed");
   expect(errors).toEqual([]);
 });
