@@ -1,6 +1,6 @@
 version: 1
-next_slice_id: 2
-slices:
+next_region_id: 2
+regions:
   - id: 1
     name: Receipt
     rectangle:

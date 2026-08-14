@@ -6,13 +6,15 @@ from pydantic import BaseModel, ConfigDict, StrictFloat, StrictInt
 try:
     from application.project_access.usecases.project_queries import ProjectQueries
     from model.project import ProjectNotFound
-    from model.project import CropRectangle, SliceNotFound
-    from application.slice_management.usecases.slice_commands import SliceCommands
+    from model.project import CropRectangle, RegionNotFound, RegionTrim
+    from application.region_management.usecases.region_commands import RegionCommands
+    from application.region_export.usecases.export_region import RegionExport, RegionRenderError
 except ImportError:
     from ..application.project_access.usecases.project_queries import ProjectQueries
     from ..model.project import ProjectNotFound
-    from ..model.project import CropRectangle, SliceNotFound
-    from ..application.slice_management.usecases.slice_commands import SliceCommands
+    from ..model.project import CropRectangle, RegionNotFound, RegionTrim
+    from ..application.region_management.usecases.region_commands import RegionCommands
+    from ..application.region_export.usecases.export_region import RegionExport, RegionRenderError
 
 
 class RectangleRequest(BaseModel):
@@ -23,28 +25,37 @@ class RectangleRequest(BaseModel):
     height: float
 
 
-class CreateSliceRequest(BaseModel):
+class CreateRegionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     rectangle: RectangleRequest
 
 
-class UpdateSliceRequest(BaseModel):
+class TrimRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    top: StrictInt
+    right: StrictInt
+    bottom: StrictInt
+    left: StrictInt
+
+
+class UpdateRegionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     rectangle: RectangleRequest
     rotation: StrictInt
-    straighten: StrictFloat
+    straighten: StrictInt | StrictFloat
+    trim: TrimRequest
 
 
 def _rectangle(request: RectangleRequest) -> CropRectangle:
     return CropRectangle(request.x, request.y, request.width, request.height)
 
 
-def _slice_response(item) -> dict:
-    return {"id": item.id, "name": item.name, "rotation": item.rotation, "straighten": item.straighten, "rectangle": {"x": item.rectangle.x, "y": item.rectangle.y, "width": item.rectangle.width, "height": item.rectangle.height}}
+def _region_response(item) -> dict:
+    return {"id": item.id, "name": item.name, "rotation": item.rotation, "straighten": item.straighten, "trim": {"top": item.trim.top, "right": item.trim.right, "bottom": item.trim.bottom, "left": item.trim.left}, "rectangle": {"x": item.rectangle.x, "y": item.rectangle.y, "width": item.rectangle.width, "height": item.rectangle.height}}
 
 
-def create_app(queries: ProjectQueries, cors_origins: list[str], slice_commands: SliceCommands) -> FastAPI:
+def create_app(queries: ProjectQueries, cors_origins: list[str], region_commands: RegionCommands, region_export: RegionExport | None = None) -> FastAPI:
     application = FastAPI(title="Document Cropper Processor")
     application.add_middleware(
         CORSMiddleware,
@@ -65,43 +76,57 @@ def create_app(queries: ProjectQueries, cors_origins: list[str], slice_commands:
             raise HTTPException(status_code=404, detail=str(error)) from error
         return Response(content=image.data, media_type="image/png")
 
-    @application.get("/api/projects/{project_id}/slices")
-    def slices(project_id: str) -> list[dict]:
+    @application.get("/api/projects/{project_id}/regions")
+    def regions(project_id: str) -> list[dict]:
         try:
-            return [_slice_response(item) for item in slice_commands.list_slices(project_id).slices]
+            return [_region_response(item) for item in region_commands.list_regions(project_id).regions]
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
 
-    @application.post("/api/projects/{project_id}/slices", status_code=201)
-    def create_slice(project_id: str, request: CreateSliceRequest) -> dict:
+    @application.post("/api/projects/{project_id}/regions", status_code=201)
+    def create_region(project_id: str, request: CreateRegionRequest) -> dict:
         try:
-            item = slice_commands.create_slice(project_id, _rectangle(request.rectangle))
+            item = region_commands.create_region(project_id, _rectangle(request.rectangle))
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
-        return _slice_response(item)
+        return _region_response(item)
 
-    @application.put("/api/projects/{project_id}/slices/{slice_id}")
-    def update_slice(project_id: str, slice_id: int, request: UpdateSliceRequest) -> dict:
+    @application.put("/api/projects/{project_id}/regions/{region_id}")
+    def update_region(project_id: str, region_id: int, request: UpdateRegionRequest) -> dict:
         try:
-            item = slice_commands.update_slice(project_id, slice_id, request.name, _rectangle(request.rectangle), request.rotation, request.straighten)
+            item = region_commands.update_region(project_id, region_id, request.name, _rectangle(request.rectangle), request.rotation, request.straighten, RegionTrim(request.trim.top, request.trim.right, request.trim.bottom, request.trim.left))
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        except SliceNotFound as error:
+        except RegionNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
-        return _slice_response(item)
+        return _region_response(item)
 
-    @application.delete("/api/projects/{project_id}/slices/{slice_id}", status_code=204)
-    def delete_slice(project_id: str, slice_id: int) -> Response:
+    @application.delete("/api/projects/{project_id}/regions/{region_id}", status_code=204)
+    def delete_region(project_id: str, region_id: int) -> Response:
         try:
-            slice_commands.delete_slice(project_id, slice_id)
+            region_commands.delete_region(project_id, region_id)
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        except SliceNotFound as error:
+        except RegionNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         return Response(status_code=204)
+
+    @application.get("/api/projects/{project_id}/regions/{region_id}/download")
+    def download_region(project_id: str, region_id: int) -> Response:
+        if region_export is None:
+            raise HTTPException(status_code=500, detail="Region export unavailable")
+        try:
+            content = region_export.export(project_id, region_id)
+        except ProjectNotFound as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except RegionNotFound as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except RegionRenderError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return Response(content=content, media_type="image/png", headers={"Content-Disposition": f'attachment; filename="{project_id}-region-{region_id}.png"'})
 
     return application

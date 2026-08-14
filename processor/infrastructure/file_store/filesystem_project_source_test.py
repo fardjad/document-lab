@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import struct
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -38,6 +39,14 @@ class FilesystemProjectStoreTests(unittest.TestCase):
             project.mkdir()
             project.joinpath("image.png").write_bytes(b"original png bytes")
             self.assertEqual(b"original png bytes", FilesystemProjectStore(root).read_project_image(ProjectId("project")).data)
+
+    def test_reads_png_ihdr_size(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            project.mkdir()
+            project.joinpath("image.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\x0dIHDR" + struct.pack(">II", 640, 480) + b"\x08\x06\x00\x00\x00")
+            self.assertEqual((640, 480), FilesystemProjectStore(root).read_project_image_size(ProjectId("project")))
 
     def test_rejects_traversal(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
