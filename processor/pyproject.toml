@@ -8,3 +8,8 @@ dependencies = [
 
 [tool.fastapi]
 entrypoint = "main:app"
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.0.0",
+]
