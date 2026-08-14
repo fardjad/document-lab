@@ -22,7 +22,7 @@ Backend uses explicit, meaningful layers. Required layout: `processor/model/`, `
 
 - Keep dependency direction inward: `model` remains independent; application ports and use cases depend only on `model` and application code; infrastructure implements application ports and owns inbound HTTP; config supplies composition inputs; `processor/main.py` wires dependencies.
 - Keep framework, HTTP, filesystem, storage, and other technology details at edges. Domain concepts and image-processing behavior must not depend on them.
-- Keep current FastAPI processor and Preact/Bun frontend shape until requirements justify a change.
+- Keep current FastAPI processor and React/Bun frontend shape until requirements justify a change.
 - Image detection, cropping, straightening, transforms, and related processing belong in this repository as requirements add them. Audio, CLI, jobs, persistence do not.
 
 ### Application and model
