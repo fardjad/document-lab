@@ -30,6 +30,7 @@ function Viewer({ project, slice, editor, saving, rootSelection, onConfirm, onCa
   const offset = useRef({ x: 0, y: 0 });
   const viewport = useRef<HTMLDivElement>(null);
   const windowRef = useRef<HTMLDivElement>(null);
+  const draftElement = useRef<HTMLDivElement>(null);
   const image = useRef<HTMLImageElement>(null);
   const dragging = useRef(false);
   const drawing = useRef(false);
@@ -55,6 +56,13 @@ function Viewer({ project, slice, editor, saving, rootSelection, onConfirm, onCa
     return { x: rectangle.x / source.naturalWidth, y: rectangle.y / source.naturalHeight, width: rectangle.width / source.naturalWidth, height: rectangle.height / source.naturalHeight };
   };
   const displayRect = editor ? undefined : slice ? imageRectangle(slice.rectangle) : undefined;
+  const updateDraftOverlay = () => {
+    if (!draftElement.current || !draft) return;
+    draftElement.current.style.left = `${offset.current.x + draft.x * zoom.current}px`;
+    draftElement.current.style.top = `${offset.current.y + draft.y * zoom.current}px`;
+    draftElement.current.style.width = `${draft.width * zoom.current}px`;
+    draftElement.current.style.height = `${draft.height * zoom.current}px`;
+  };
   const bounds = () => {
     const imageElement = image.current;
     return displayRect ?? (imageElement ? { x: 0, y: 0, width: imageElement.naturalWidth, height: imageElement.naturalHeight } : undefined);
@@ -71,6 +79,7 @@ function Viewer({ project, slice, editor, saving, rootSelection, onConfirm, onCa
     imageElement.style.left = `${-rect.x}px`;
     imageElement.style.top = `${-rect.y}px`;
     windowElement.style.transform = `translate(${offset.current.x}px, ${offset.current.y}px) scale(${zoom.current})`;
+    updateDraftOverlay();
     setZoomReadout(Math.round(zoom.current * 100));
   };
   const fit = () => {
@@ -239,7 +248,7 @@ function Viewer({ project, slice, editor, saving, rootSelection, onConfirm, onCa
   const confirmDraft = () => { if (!draft || draft.width < 4 || draft.height < 4) return; const rectangle = normalizedRectangle(draft); if (rectangle) onConfirm(rectangle); };
   return <section className={`viewer${editor ? " drawing" : ""}`} ref={viewport} onWheel={wheel} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onAuxClick={(event) => { if (event.button === 1) event.preventDefault(); }}>
     {project?.imageUrl ? <div className={`image-window${displayRect ? " crop-window" : ""}`} ref={windowRef}><img key={project.id} ref={image} className="document" src={project.imageUrl} alt={project.name} draggable={false} onLoad={handleImageLoad} /></div> : <div className="empty-view">Select project to begin</div>}
-    {editor && draft && <div className="slice-draft" style={overlayStyle} aria-label="Slice selection"><button className="draft-move-surface" onPointerDown={startMove} onClick={stopViewerPointer} aria-label="Move slice rectangle" /><button className="slice-handle handle-top" onPointerDown={(event) => startResize(event, "top")} onClick={stopViewerPointer} aria-label="Resize slice top edge" /><button className="slice-handle handle-right" onPointerDown={(event) => startResize(event, "right")} onClick={stopViewerPointer} aria-label="Resize slice right edge" /><button className="slice-handle handle-bottom" onPointerDown={(event) => startResize(event, "bottom")} onClick={stopViewerPointer} aria-label="Resize slice bottom edge" /><button className="slice-handle handle-left" onPointerDown={(event) => startResize(event, "left")} onClick={stopViewerPointer} aria-label="Resize slice left edge" /><span>{Math.round(draft.width)} × {Math.round(draft.height)}</span><div className="slice-actions" onPointerDown={overlayPointerDown} onClick={stopViewerPointer}><button onClick={confirmDraft} disabled={saving || draft.width < 4 || draft.height < 4} aria-label="Confirm slice">✓</button><button onClick={onCancel} disabled={saving} aria-label="Cancel slice">×</button></div></div>}
+    {editor && draft && <div ref={draftElement} className="slice-draft" style={overlayStyle} aria-label="Slice selection" onPointerDown={startMove}><button className="draft-move-surface" onPointerDown={startMove} onClick={stopViewerPointer} aria-label="Move slice rectangle" /><button className="slice-handle handle-top" onPointerDown={(event) => startResize(event, "top")} onClick={stopViewerPointer} aria-label="Resize slice top edge" /><button className="slice-handle handle-right" onPointerDown={(event) => startResize(event, "right")} onClick={stopViewerPointer} aria-label="Resize slice right edge" /><button className="slice-handle handle-bottom" onPointerDown={(event) => startResize(event, "bottom")} onClick={stopViewerPointer} aria-label="Resize slice bottom edge" /><button className="slice-handle handle-left" onPointerDown={(event) => startResize(event, "left")} onClick={stopViewerPointer} aria-label="Resize slice left edge" /><span>{Math.round(draft.width)} × {Math.round(draft.height)}</span><div className="slice-actions" onPointerDown={overlayPointerDown} onClick={stopViewerPointer}><button onClick={confirmDraft} disabled={saving || draft.width < 4 || draft.height < 4} aria-label="Confirm slice">✓</button><button onClick={onCancel} disabled={saving} aria-label="Cancel slice">×</button></div></div>}
     {editor && <div className="draw-hint">{draft ? "Drag box to move · Space + drag or middle-drag to pan" : "Drag over image to draw slice · Space + drag or middle-drag to pan"}</div>}
     <div className="zoom-readout">{zoomReadout}%</div>
   </section>;
