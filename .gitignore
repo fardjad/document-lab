@@ -22,6 +22,8 @@ node_modules/
 dist/
 .bun/
 *.tsbuildinfo
+test-results/
+playwright-report/
 
 # OS and editor files
 .DS_Store

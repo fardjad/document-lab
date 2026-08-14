@@ -20,4 +20,6 @@ class Settings:
     def from_environment(cls) -> "Settings":
         configured = os.getenv("CORS_ORIGINS")
         origins = [item.strip() for item in configured.split(",") if item.strip()] if configured else DEFAULT_CORS_ORIGINS.copy()
-        return cls((Path(__file__).resolve().parents[2] / "projects").resolve(), origins)
+        default_root = Path(__file__).resolve().parents[2] / "projects"
+        project_root = Path(os.path.expandvars(os.path.expanduser(os.getenv("PROJECTS_ROOT", str(default_root))))).resolve()
+        return cls(project_root, origins)

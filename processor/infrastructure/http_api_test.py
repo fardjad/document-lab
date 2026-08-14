@@ -4,8 +4,10 @@ from fastapi.testclient import TestClient
 
 from application.project_access.ports.project_source import ProjectSource
 from application.project_access.usecases.project_queries import ProjectQueries
+from application.slice_management.usecases.slice_commands import SliceCommands
 from infrastructure.http_api import create_app
 from model.project import ProjectId, ProjectImage, ProjectNotFound
+from model.project import ProjectSlices
 
 
 class FakeProjectSource(ProjectSource):
@@ -18,8 +20,17 @@ class FakeProjectSource(ProjectSource):
         return ProjectImage(b"png bytes")
 
 
+class FakeSliceStore:
+    def read_project_slices(self, project_id: ProjectId) -> ProjectSlices:
+        return ProjectSlices(1)
+
+    def write_project_slices(self, project_id: ProjectId, slices: ProjectSlices) -> None:
+        pass
+
+
 def test_client() -> TestClient:
-    return TestClient(create_app(ProjectQueries(FakeProjectSource()), ["http://allowed.test"]))
+    store = FakeSliceStore()
+    return TestClient(create_app(ProjectQueries(FakeProjectSource()), ["http://allowed.test"], SliceCommands(store)))
 
 
 class HttpApiTests(unittest.TestCase):
