@@ -1,0 +1,13 @@
+{
+  "name": "document-cropper-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/server.ts",
+    "build": "bun run build.ts"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.0.0",
+    "preact": "^10.26.4"
+  }
+}
