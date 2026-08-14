@@ -37,6 +37,17 @@ class PillowRegionRendererTests(unittest.TestCase):
             self.assertEqual("RGBA", image.mode)
             self.assertTrue(any(image.getpixel((x, y))[3] == 0 for x in range(image.width) for y in range(image.height)))
 
+    def test_fine_straighten_has_antialiased_intermediate_pixels(self) -> None:
+        image = Image.new("RGBA", (12, 12), (255, 255, 255, 255))
+        for y in range(12):
+            image.putpixel((5, y), (0, 0, 0, 255))
+        source = BytesIO()
+        image.save(source, "PNG")
+        rendered = PillowRegionRenderer().render(ProjectImage(source.getvalue()), CropRegion(1, "x", CropRectangle(0, 0, 1, 1), straighten=7.0))
+        with Image.open(BytesIO(rendered)) as output:
+            pixels = [output.getpixel((x, y)) for x in range(output.width) for y in range(output.height)]
+            self.assertTrue(any(0 < pixel[0] < 255 and pixel[3] > 0 for pixel in pixels))
+
 
 if __name__ == "__main__":
     unittest.main()

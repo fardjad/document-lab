@@ -20,10 +20,14 @@ class PillowRegionRenderer:
                 right = math.ceil((crop.rectangle.x + crop.rectangle.width) * width)
                 bottom = math.ceil((crop.rectangle.y + crop.rectangle.height) * height)
                 result = source_rgba.crop((left, top, right, bottom))
-                if crop.rotation:
-                    result = result.rotate(-crop.rotation, expand=True)
+                if crop.rotation == 90:
+                    result = result.transpose(Image.Transpose.ROTATE_270)
+                elif crop.rotation == 180:
+                    result = result.transpose(Image.Transpose.ROTATE_180)
+                elif crop.rotation == 270:
+                    result = result.transpose(Image.Transpose.ROTATE_90)
                 if crop.straighten:
-                    result = result.rotate(-crop.straighten, expand=True)
+                    result = result.rotate(-crop.straighten, resample=Image.Resampling.BICUBIC, expand=True, fillcolor=(0, 0, 0, 0))
                 trim = crop.trim
                 final_width = result.width - trim.left - trim.right
                 final_height = result.height - trim.top - trim.bottom

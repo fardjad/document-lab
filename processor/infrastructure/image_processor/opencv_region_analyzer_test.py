@@ -43,7 +43,7 @@ class OpenCVRegionAnalyzerTests(unittest.TestCase):
         image.save(output, "PNG")
         result = OpenCVRegionAnalyzer().analyze(ProjectImage(output.getvalue()), CropRegion(1, "r", CropRectangle(0, 0, 1, 1), straighten=10), "trim")
         self.assertIsInstance(result.suggestion, RegionTrim)
-        self.assertEqual(20, result.suggestion.top)
+        self.assertEqual(18, result.suggestion.top)
         self.assertGreater(result.suggestion.left, 0)
 
     def test_edge_speck_does_not_expand_trim_bounds(self) -> None:
