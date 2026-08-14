@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StrictInt
 
 try:
     from application.project_access.usecases.project_queries import ProjectQueries
@@ -32,6 +32,7 @@ class UpdateSliceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     rectangle: RectangleRequest
+    rotation: StrictInt
 
 
 def _rectangle(request: RectangleRequest) -> CropRectangle:
@@ -39,7 +40,7 @@ def _rectangle(request: RectangleRequest) -> CropRectangle:
 
 
 def _slice_response(item) -> dict:
-    return {"id": item.id, "name": item.name, "rectangle": {"x": item.rectangle.x, "y": item.rectangle.y, "width": item.rectangle.width, "height": item.rectangle.height}}
+    return {"id": item.id, "name": item.name, "rotation": item.rotation, "rectangle": {"x": item.rectangle.x, "y": item.rectangle.y, "width": item.rectangle.width, "height": item.rectangle.height}}
 
 
 def create_app(queries: ProjectQueries, cors_origins: list[str], slice_commands: SliceCommands) -> FastAPI:
@@ -83,7 +84,7 @@ def create_app(queries: ProjectQueries, cors_origins: list[str], slice_commands:
     @application.put("/api/projects/{project_id}/slices/{slice_id}")
     def update_slice(project_id: str, slice_id: int, request: UpdateSliceRequest) -> dict:
         try:
-            item = slice_commands.update_slice(project_id, slice_id, request.name, _rectangle(request.rectangle))
+            item = slice_commands.update_slice(project_id, slice_id, request.name, _rectangle(request.rectangle), request.rotation)
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except SliceNotFound as error:

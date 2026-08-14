@@ -7,7 +7,7 @@ import { TreeItem } from "@mui/x-tree-view/TreeItem";
 import "./style.css";
 
 type Rectangle = { x: number; y: number; width: number; height: number };
-type Slice = { id: number; name: string; rectangle: Rectangle };
+type Slice = { id: number; name: string; rectangle: Rectangle; rotation: number };
 type Project = { id: string; name: string; imageUrl: string; slices: Slice[]; slicesLoading?: boolean; slicesError?: string };
 type EditorMode = { kind: "create" } | { kind: "edit"; slice: Slice };
 
@@ -23,6 +23,10 @@ function normalizeProject(id: string): Project {
   return { id, name: id, imageUrl: `${API}/projects/${encodeURIComponent(id)}/image`, slices: [] };
 }
 
+function rotatedBounds(rectangle: Rectangle, rotation: number) {
+  return rotation % 180 !== 0 ? { width: rectangle.height, height: rectangle.width } : { width: rectangle.width, height: rectangle.height };
+}
+
 type ViewerControls = { fit: () => void; fitWidth: () => void; actualSize: () => void; zoomOut: () => void; zoomIn: () => void };
 
 function Viewer({ project, slice, editor, saving, rootSelection, onConfirm, onCancel, onControlsReady }: { project?: Project; slice?: Slice; editor: EditorMode | null; saving: boolean; rootSelection: number; onConfirm: (rectangle: Rectangle) => void; onCancel: () => void; onControlsReady: (controls: ViewerControls | null) => void }) {
@@ -30,6 +34,7 @@ function Viewer({ project, slice, editor, saving, rootSelection, onConfirm, onCa
   const offset = useRef({ x: 0, y: 0 });
   const viewport = useRef<HTMLDivElement>(null);
   const windowRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
   const draftElement = useRef<HTMLDivElement>(null);
   const image = useRef<HTMLImageElement>(null);
   const dragging = useRef(false);
@@ -56,6 +61,7 @@ function Viewer({ project, slice, editor, saving, rootSelection, onConfirm, onCa
     return { x: rectangle.x / source.naturalWidth, y: rectangle.y / source.naturalHeight, width: rectangle.width / source.naturalWidth, height: rectangle.height / source.naturalHeight };
   };
   const displayRect = editor ? undefined : slice ? imageRectangle(slice.rectangle) : undefined;
+  const rotation = displayRect && slice && !editor ? ((slice.rotation % 360) + 360) % 360 : 0;
   const updateDraftOverlay = () => {
     if (!draftElement.current || !draft) return;
     draftElement.current.style.left = `${offset.current.x + draft.x * zoom.current}px`;
@@ -63,28 +69,39 @@ function Viewer({ project, slice, editor, saving, rootSelection, onConfirm, onCa
     draftElement.current.style.width = `${draft.width * zoom.current}px`;
     draftElement.current.style.height = `${draft.height * zoom.current}px`;
   };
-  const bounds = () => {
+  const geometry = () => {
     const imageElement = image.current;
-    return displayRect ?? (imageElement ? { x: 0, y: 0, width: imageElement.naturalWidth, height: imageElement.naturalHeight } : undefined);
+    if (!imageElement) return undefined;
+    const source = displayRect ?? { x: 0, y: 0, width: imageElement.naturalWidth, height: imageElement.naturalHeight };
+    return { source, view: displayRect ? { x: 0, y: 0, ...rotatedBounds(source, rotation) } : source };
   };
   const update = () => {
     const imageElement = image.current;
     const windowElement = windowRef.current;
-    const rect = bounds();
-    if (!imageElement || !windowElement || !rect?.width || !rect.height) return;
+    const viewGeometry = geometry();
+    if (!imageElement || !windowElement || !viewGeometry?.view.width || !viewGeometry.view.height) return;
+    const rect = viewGeometry.view;
+    const sourceRect = viewGeometry.source;
     windowElement.style.width = `${rect.width}px`;
     windowElement.style.height = `${rect.height}px`;
+    if (surfaceRef.current) {
+      surfaceRef.current.style.width = `${sourceRect.width}px`;
+      surfaceRef.current.style.height = `${sourceRect.height}px`;
+      surfaceRef.current.style.left = `${(rect.width - sourceRect.width) / 2}px`;
+      surfaceRef.current.style.top = `${(rect.height - sourceRect.height) / 2}px`;
+      surfaceRef.current.style.transform = rotation ? `rotate(${rotation}deg)` : "none";
+    }
     imageElement.style.width = `${imageElement.naturalWidth}px`;
     imageElement.style.height = `${imageElement.naturalHeight}px`;
-    imageElement.style.left = `${-rect.x}px`;
-    imageElement.style.top = `${-rect.y}px`;
+    imageElement.style.left = `${-(displayRect?.x ?? 0)}px`;
+    imageElement.style.top = `${-(displayRect?.y ?? 0)}px`;
     windowElement.style.transform = `translate(${offset.current.x}px, ${offset.current.y}px) scale(${zoom.current})`;
     updateDraftOverlay();
     setZoomReadout(Math.round(zoom.current * 100));
   };
   const fit = () => {
     const viewportElement = viewport.current;
-    const rect = bounds();
+    const rect = geometry()?.view;
     if (!viewportElement || !rect?.width || !rect.height) return;
     const scale = Math.min((viewportElement.clientWidth - 64) / rect.width, (viewportElement.clientHeight - 64) / rect.height);
     zoom.current = Math.max(0.15, Math.min(1, scale));
@@ -95,7 +112,7 @@ function Viewer({ project, slice, editor, saving, rootSelection, onConfirm, onCa
   fitRef.current = fit;
   const fitWidth = () => {
     const viewportElement = viewport.current;
-    const rect = bounds();
+    const rect = geometry()?.view;
     if (!viewportElement || !rect?.width || !rect.height) return;
     zoom.current = Math.max(0.15, Math.min(6, (viewportElement.clientWidth - 64) / rect.width));
     offset.current.x = (viewportElement.clientWidth - rect.width * zoom.current) / 2;
@@ -103,7 +120,7 @@ function Viewer({ project, slice, editor, saving, rootSelection, onConfirm, onCa
   };
   const actualSize = () => {
     const viewportElement = viewport.current;
-    const rect = bounds();
+    const rect = geometry()?.view;
     if (!viewportElement || !rect?.width || !rect.height) return;
     zoom.current = 1;
     offset.current = { x: (viewportElement.clientWidth - rect.width) / 2, y: (viewportElement.clientHeight - rect.height) / 2 };
@@ -151,7 +168,7 @@ function Viewer({ project, slice, editor, saving, rootSelection, onConfirm, onCa
     offset.current = { x: 0, y: 0 };
     setZoomReadout(100);
     fit();
-  }, [slice?.id]);
+  }, [slice?.id, slice?.rotation]);
   useEffect(() => {
     const keyDown = (event: KeyboardEvent) => { if (event.code === "Space") spaceHeld.current = true; };
     const keyUp = (event: KeyboardEvent) => { if (event.code === "Space") spaceHeld.current = false; };
@@ -247,7 +264,7 @@ function Viewer({ project, slice, editor, saving, rootSelection, onConfirm, onCa
   const stopViewerPointer = (event: ReactPointerEvent | ReactMouseEvent) => event.stopPropagation();
   const confirmDraft = () => { if (!draft || draft.width < 4 || draft.height < 4) return; const rectangle = normalizedRectangle(draft); if (rectangle) onConfirm(rectangle); };
   return <section className={`viewer${editor ? " drawing" : ""}`} ref={viewport} onWheel={wheel} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onAuxClick={(event) => { if (event.button === 1) event.preventDefault(); }}>
-    {project?.imageUrl ? <div className={`image-window${displayRect ? " crop-window" : ""}`} ref={windowRef}><img key={project.id} ref={image} className="document" src={project.imageUrl} alt={project.name} draggable={false} onLoad={handleImageLoad} /></div> : <div className="empty-view">Select project to begin</div>}
+    {project?.imageUrl ? <div className={`image-window${displayRect ? " crop-window" : ""}`} ref={windowRef}><div className="image-surface" ref={surfaceRef}><img key={project.id} ref={image} className="document" src={project.imageUrl} alt={project.name} draggable={false} onLoad={handleImageLoad} /></div></div> : <div className="empty-view">Select project to begin</div>}
     {editor && draft && <div ref={draftElement} className="slice-draft" style={overlayStyle} aria-label="Slice selection" onPointerDown={startMove}><button className="draft-move-surface" onPointerDown={startMove} onClick={stopViewerPointer} aria-label="Move slice rectangle" /><button className="slice-handle handle-top" onPointerDown={(event) => startResize(event, "top")} onClick={stopViewerPointer} aria-label="Resize slice top edge" /><button className="slice-handle handle-right" onPointerDown={(event) => startResize(event, "right")} onClick={stopViewerPointer} aria-label="Resize slice right edge" /><button className="slice-handle handle-bottom" onPointerDown={(event) => startResize(event, "bottom")} onClick={stopViewerPointer} aria-label="Resize slice bottom edge" /><button className="slice-handle handle-left" onPointerDown={(event) => startResize(event, "left")} onClick={stopViewerPointer} aria-label="Resize slice left edge" /><span>{Math.round(draft.width)} × {Math.round(draft.height)}</span><div className="slice-actions" onPointerDown={overlayPointerDown} onClick={stopViewerPointer}><button onClick={confirmDraft} disabled={saving || draft.width < 4 || draft.height < 4} aria-label="Confirm slice">✓</button><button onClick={onCancel} disabled={saving} aria-label="Cancel slice">×</button></div></div>}
     {editor && <div className="draw-hint">{draft ? "Drag box to move · Space + drag or middle-drag to pan" : "Drag over image to draw slice · Space + drag or middle-drag to pan"}</div>}
     <div className="zoom-readout">{zoomReadout}%</div>
@@ -281,11 +298,12 @@ function App() {
   useEffect(() => { request<string[]>(`${API}/projects`).then((ids) => { const items = ids.map(normalizeProject); setProjects(items); setSelectedProjectId(items[0]?.id ?? ""); if (items[0]) setExpandedItems([treeProjectId(items[0].id)]); }).catch((reason) => setError(reason.message)).finally(() => setLoading(false)); }, []);
   useEffect(() => { if (!selectedProjectId) return; setSelectedSliceId(null); setEditor(null); setProjects((items) => items.map((item) => item.id === selectedProjectId ? { ...item, slicesLoading: true, slicesError: "" } : item)); request<Slice[]>(`${API}/projects/${encodeURIComponent(selectedProjectId)}/slices`).then((slices) => setProjects((items) => items.map((item) => item.id === selectedProjectId ? { ...item, slices, slicesLoading: false } : item))).catch((reason) => setProjects((items) => items.map((item) => item.id === selectedProjectId ? { ...item, slicesLoading: false, slicesError: reason.message } : item))); }, [selectedProjectId]);
   const selectProject = (id: string) => { setSelectedProjectId(id); setSelectedSliceId(null); setEditor(null); setRootSelection((value) => value + 1); };
-  const updateSlice = async (sliceId: number, body: { name: string; rectangle: Rectangle }) => { const updated = await request<Slice>(`${API}/projects/${encodeURIComponent(selectedProjectId)}/slices/${sliceId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); setProjects((items) => items.map((item) => item.id === selectedProjectId ? { ...item, slices: item.slices.map((itemSlice) => itemSlice.id === sliceId ? updated : itemSlice) } : item)); };
-  const confirmSlice = async (rectangle: Rectangle) => { if (!project) return; setSaving(true); try { if (editor?.kind === "edit") { await updateSlice(editor.slice.id, { name: editor.slice.name, rectangle }); } else { const created = await request<Slice>(`${API}/projects/${encodeURIComponent(project.id)}/slices`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rectangle }) }); setProjects((items) => items.map((item) => item.id === project.id ? { ...item, slices: [...item.slices, created] } : item)); setSelectedSliceId(created.id); } setEditor(null); } catch (reason) { setError(reason.message); } finally { setSaving(false); } };
-  const renameSlice = async (item: Slice, name: string) => { const nextName = name.trim(); if (!nextName || nextName === item.name) return; try { await updateSlice(item.id, { name: nextName, rectangle: item.rectangle }); } catch (reason) { setError(reason.message); } };
+  const updateSlice = async (sliceId: number, body: { name: string; rectangle: Rectangle; rotation: number }) => { const updated = await request<Slice>(`${API}/projects/${encodeURIComponent(selectedProjectId)}/slices/${sliceId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); setProjects((items) => items.map((item) => item.id === selectedProjectId ? { ...item, slices: item.slices.map((itemSlice) => itemSlice.id === sliceId ? updated : itemSlice) } : item)); };
+  const confirmSlice = async (rectangle: Rectangle) => { if (!project) return; setSaving(true); try { if (editor?.kind === "edit") { await updateSlice(editor.slice.id, { name: editor.slice.name, rectangle, rotation: editor.slice.rotation }); } else { const created = await request<Slice>(`${API}/projects/${encodeURIComponent(project.id)}/slices`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rectangle }) }); setProjects((items) => items.map((item) => item.id === project.id ? { ...item, slices: [...item.slices, created] } : item)); setSelectedSliceId(created.id); } setEditor(null); } catch (reason) { setError(reason.message); } finally { setSaving(false); } };
+  const renameSlice = async (item: Slice, name: string) => { const nextName = name.trim(); if (!nextName || nextName === item.name) return; try { await updateSlice(item.id, { name: nextName, rectangle: item.rectangle, rotation: item.rotation }); } catch (reason) { setError(reason.message); } };
+  const rotateSlice = async (item: Slice, delta: number) => { setSaving(true); try { await updateSlice(item.id, { name: item.name, rectangle: item.rectangle, rotation: (item.rotation + delta + 360) % 360 }); } catch (reason) { setError(reason.message); } finally { setSaving(false); } };
   const deleteSlice = async (item: Slice) => { if (!confirm(`Delete “${item.name}”?`)) return; try { await request<void>(`${API}/projects/${encodeURIComponent(selectedProjectId)}/slices/${item.id}`, { method: "DELETE" }); setProjects((items) => items.map((entry) => entry.id === selectedProjectId ? { ...entry, slices: entry.slices.filter((sliceItem) => sliceItem.id !== item.id) } : entry)); if (selectedSliceId === item.id) setSelectedSliceId(null); } catch (reason) { setError(reason.message); } };
-  return <main className="app-shell"><aside className="toolbar"><div className="brand"><span className="brand-mark">◩</span><span>Cropper</span></div><div className="toolbar-section"><span className="eyebrow">Projects</span>{loading && <p className="muted">Loading…</p>}{error && <p className="error">{error}</p>}{!loading && !error && projects.length === 0 && <p className="muted">No projects found.</p>}<ProjectTree projects={projects} selectedProjectId={selectedProjectId} selectedSliceId={selectedSliceId} expandedItems={expandedItems} onProject={selectProject} onExpanded={setExpandedItems} onSlice={(projectId, id) => { setEditor(null); setSelectedProjectId(projectId); setSelectedSliceId(id); }} onEdit={(item) => { setSelectedSliceId(item.id); setEditor({ kind: "edit", slice: item }); }} onDelete={deleteSlice} onRename={renameSlice} /></div><div className="toolbar-foot">Drag edge to resize<br /><span>Wheel zoom · drag pan</span></div></aside><div className="workspace"><header><div><span className="eyebrow">Workspace</span><h1>{project?.name ?? "Document viewer"}</h1></div><div className="header-tools"><button className="slice-tool" onClick={() => setEditor({ kind: "create" })} disabled={!project} aria-pressed={Boolean(editor)}>＋ Slice</button><div className="view-presets"><button onClick={() => viewerControls?.fit()} disabled={!viewerControls}>Fit</button><button onClick={() => viewerControls?.fitWidth()} disabled={!viewerControls}>Fit Width</button><button onClick={() => viewerControls?.actualSize()} disabled={!viewerControls}>Actual Size</button></div><div className="zoom-tools"><button onClick={() => viewerControls?.zoomOut()} disabled={!viewerControls} aria-label="Zoom out">−</button><button onClick={() => viewerControls?.zoomIn()} disabled={!viewerControls} aria-label="Zoom in">+</button></div><span className="status"><i />{project ? "Ready" : "Waiting"}</span></div></header><Viewer project={project} slice={slice} editor={editor} saving={saving} rootSelection={rootSelection} onConfirm={confirmSlice} onCancel={() => setEditor(null)} onControlsReady={setViewerControls} /></div></main>;
+  return <main className="app-shell"><aside className="toolbar"><div className="brand"><span className="brand-mark">◩</span><span>Cropper</span></div><div className="toolbar-section"><span className="eyebrow">Projects</span>{loading && <p className="muted">Loading…</p>}{error && <p className="error">{error}</p>}{!loading && !error && projects.length === 0 && <p className="muted">No projects found.</p>}<ProjectTree projects={projects} selectedProjectId={selectedProjectId} selectedSliceId={selectedSliceId} expandedItems={expandedItems} onProject={selectProject} onExpanded={setExpandedItems} onSlice={(projectId, id) => { setEditor(null); setSelectedProjectId(projectId); setSelectedSliceId(id); }} onEdit={(item) => { setSelectedSliceId(item.id); setEditor({ kind: "edit", slice: item }); }} onDelete={deleteSlice} onRename={renameSlice} /></div><div className="toolbar-foot">Drag edge to resize<br /><span>Wheel zoom · drag pan</span></div></aside><div className="workspace"><header><div><span className="eyebrow">Workspace</span><h1>{project?.name ?? "Document viewer"}</h1></div><div className="header-tools"><button className="slice-tool" onClick={() => setEditor({ kind: "create" })} disabled={!project} aria-pressed={Boolean(editor)}>＋ Slice</button>{slice && !editor && <div className="rotation-tools"><button onClick={() => rotateSlice(slice, -90)} disabled={saving} aria-label="Rotate slice left 90 degrees" title="Rotate slice left 90 degrees">↶ 90°</button><button onClick={() => rotateSlice(slice, 90)} disabled={saving} aria-label="Rotate slice right 90 degrees" title="Rotate slice right 90 degrees">↷ 90°</button></div>}<div className="view-presets"><button onClick={() => viewerControls?.fit()} disabled={!viewerControls}>Fit</button><button onClick={() => viewerControls?.fitWidth()} disabled={!viewerControls}>Fit Width</button><button onClick={() => viewerControls?.actualSize()} disabled={!viewerControls}>Actual Size</button></div><div className="zoom-tools"><button onClick={() => viewerControls?.zoomOut()} disabled={!viewerControls} aria-label="Zoom out">−</button><button onClick={() => viewerControls?.zoomIn()} disabled={!viewerControls} aria-label="Zoom in">+</button></div><span className="status"><i />{project ? "Ready" : "Waiting"}</span></div></header><Viewer project={project} slice={slice} editor={editor} saving={saving} rootSelection={rootSelection} onConfirm={confirmSlice} onCancel={() => setEditor(null)} onControlsReady={setViewerControls} /></div></main>;
 }
 
 createRoot(document.getElementById("app")!).render(<App />);

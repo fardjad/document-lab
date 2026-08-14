@@ -21,7 +21,7 @@ class SliceCommandsTests(unittest.TestCase):
         commands = SliceCommands(store)
         rectangle = CropRectangle(0, 0, 10, 20)
         first = commands.create_slice("project", rectangle)
-        commands.update_slice("project", first.id, "Renamed", rectangle)
+        commands.update_slice("project", first.id, "Renamed", rectangle, 90)
         commands.delete_slice("project", first.id)
         second = commands.create_slice("project", rectangle)
         self.assertEqual((1, 2), (first.id, second.id))

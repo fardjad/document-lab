@@ -45,6 +45,7 @@ class CropSlice:
     id: int
     name: str
     rectangle: CropRectangle
+    rotation: int = 0
 
     def __post_init__(self) -> None:
         if isinstance(self.id, bool) or not isinstance(self.id, int) or self.id < 1:
@@ -53,6 +54,9 @@ class CropSlice:
             raise ValueError("Invalid slice name")
         if not isinstance(self.rectangle, CropRectangle):
             raise ValueError("Invalid crop rectangle")
+        if isinstance(self.rotation, bool) or not isinstance(self.rotation, int) or self.rotation % 90 != 0:
+            raise ValueError("Invalid slice rotation")
+        object.__setattr__(self, "rotation", self.rotation % 360)
 
 
 @dataclass(frozen=True)

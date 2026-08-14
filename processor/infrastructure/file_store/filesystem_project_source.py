@@ -72,12 +72,12 @@ class FilesystemProjectStore(ProjectSource, ProjectSliceStore):
                 raise ValueError
             slices = []
             for raw in raw_slices:
-                if not isinstance(raw, dict) or set(raw) != {"id", "name", "rectangle"}:
+                if not isinstance(raw, dict) or set(raw) not in ({"id", "name", "rectangle"}, {"id", "name", "rectangle", "rotation"}):
                     raise ValueError
                 rectangle = raw["rectangle"]
                 if not isinstance(rectangle, dict) or set(rectangle) != {"x", "y", "width", "height"}:
                     raise ValueError
-                slices.append(CropSlice(raw["id"], raw["name"], CropRectangle(rectangle["x"], rectangle["y"], rectangle["width"], rectangle["height"])))
+                slices.append(CropSlice(raw["id"], raw["name"], CropRectangle(rectangle["x"], rectangle["y"], rectangle["width"], rectangle["height"]), raw.get("rotation", 0)))
             return ProjectSlices(next_id, tuple(slices))
         except (KeyError, TypeError, ValueError, yaml.YAMLError) as error:
             raise ValueError("Invalid project metadata") from error
@@ -88,7 +88,7 @@ class FilesystemProjectStore(ProjectSource, ProjectSliceStore):
             "version": 1,
             "next_slice_id": slices.next_slice_id,
             "slices": [
-                {"id": item.id, "name": item.name, "rectangle": {"x": item.rectangle.x, "y": item.rectangle.y, "width": item.rectangle.width, "height": item.rectangle.height}}
+                {"id": item.id, "name": item.name, "rotation": item.rotation, "rectangle": {"x": item.rectangle.x, "y": item.rectangle.y, "width": item.rectangle.width, "height": item.rectangle.height}}
                 for item in slices.slices
             ],
         }

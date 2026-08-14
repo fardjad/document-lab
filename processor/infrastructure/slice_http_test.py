@@ -40,6 +40,17 @@ class SliceHttpTests(unittest.TestCase):
         response = client.post("/api/projects/project/slices", json={"rectangle": {"x": 0, "y": 0, "width": 1, "height": 1}})
         self.assertEqual(201, response.status_code)
         self.assertEqual("Slice 1", response.json()["name"])
+        self.assertEqual(0, response.json()["rotation"])
+
+    def test_put_requires_and_returns_rotation(self) -> None:
+        store = FakeStore()
+        client = TestClient(create_app(ProjectQueries(store), [], SliceCommands(store)))
+        client.post("/api/projects/project/slices", json={"rectangle": {"x": 0, "y": 0, "width": 1, "height": 1}})
+        response = client.put("/api/projects/project/slices/1", json={"name": "Turned", "rotation": 90, "rectangle": {"x": 0, "y": 0, "width": 1, "height": 1}})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(90, response.json()["rotation"])
+        self.assertEqual(422, client.put("/api/projects/project/slices/1", json={"name": "Missing", "rectangle": {"x": 0, "y": 0, "width": 1, "height": 1}}).status_code)
+        self.assertEqual(422, client.put("/api/projects/project/slices/1", json={"name": "Invalid", "rotation": 45, "rectangle": {"x": 0, "y": 0, "width": 1, "height": 1}}).status_code)
 
     def test_create_rejects_name_field(self) -> None:
         store = FakeStore()

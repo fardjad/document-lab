@@ -21,6 +21,19 @@ class SliceModelTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ProjectSlices(1, (item,))
 
+    def test_rotation_defaults_and_canonicalizes(self) -> None:
+        rectangle = CropRectangle(0, 0, 1, 1)
+        self.assertEqual(0, CropSlice(1, "Slice 1", rectangle).rotation)
+        self.assertEqual(270, CropSlice(1, "Slice 1", rectangle, -90).rotation)
+        self.assertEqual((90, 180, 270), tuple(CropSlice(1, "Slice 1", rectangle, value).rotation for value in (90, 180, 270)))
+        self.assertEqual(0, CropSlice(1, "Slice 1", rectangle, 360).rotation)
+
+    def test_rotation_requires_integer_multiples_of_90(self) -> None:
+        rectangle = CropRectangle(0, 0, 1, 1)
+        for value in (True, 45, 45.0, "90"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                CropSlice(1, "Slice 1", rectangle, value)  # type: ignore[arg-type]
+
 
 if __name__ == "__main__":
     unittest.main()
