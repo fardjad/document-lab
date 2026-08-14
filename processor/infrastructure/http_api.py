@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from typing import Literal
 from pydantic import BaseModel, ConfigDict, StrictFloat, StrictInt
 
 try:
@@ -9,12 +10,16 @@ try:
     from model.project import CropRectangle, RegionNotFound, RegionTrim
     from application.region_management.usecases.region_commands import RegionCommands
     from application.region_export.usecases.export_region import RegionExport, RegionRenderError
+    from application.region_analysis.usecases.analyze_region import RegionAnalysis
+    from application.region_analysis.results import AnalysisResult
 except ImportError:
     from ..application.project_access.usecases.project_queries import ProjectQueries
     from ..model.project import ProjectNotFound
     from ..model.project import CropRectangle, RegionNotFound, RegionTrim
     from ..application.region_management.usecases.region_commands import RegionCommands
     from ..application.region_export.usecases.export_region import RegionExport, RegionRenderError
+    from ..application.region_analysis.usecases.analyze_region import RegionAnalysis
+    from ..application.region_analysis.results import AnalysisResult
 
 
 class RectangleRequest(BaseModel):
@@ -47,6 +52,11 @@ class UpdateRegionRequest(BaseModel):
     trim: TrimRequest
 
 
+class RegionAnalysisRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    operation: Literal["straighten", "trim"]
+
+
 def _rectangle(request: RectangleRequest) -> CropRectangle:
     return CropRectangle(request.x, request.y, request.width, request.height)
 
@@ -55,7 +65,14 @@ def _region_response(item) -> dict:
     return {"id": item.id, "name": item.name, "rotation": item.rotation, "straighten": item.straighten, "trim": {"top": item.trim.top, "right": item.trim.right, "bottom": item.trim.bottom, "left": item.trim.left}, "rectangle": {"x": item.rectangle.x, "y": item.rectangle.y, "width": item.rectangle.width, "height": item.rectangle.height}}
 
 
-def create_app(queries: ProjectQueries, cors_origins: list[str], region_commands: RegionCommands, region_export: RegionExport | None = None) -> FastAPI:
+def _analysis_response(result: AnalysisResult) -> dict:
+    suggestion = result.suggestion
+    if isinstance(suggestion, RegionTrim):
+        suggestion = {"top": suggestion.top, "right": suggestion.right, "bottom": suggestion.bottom, "left": suggestion.left}
+    return {"suggestion": suggestion, "confidence": result.confidence, "reason": result.reason}
+
+
+def create_app(queries: ProjectQueries, cors_origins: list[str], region_commands: RegionCommands, region_export: RegionExport | None = None, region_analysis: RegionAnalysis | None = None) -> FastAPI:
     application = FastAPI(title="Document Cropper Processor")
     application.add_middleware(
         CORSMiddleware,
@@ -128,5 +145,16 @@ def create_app(queries: ProjectQueries, cors_origins: list[str], region_commands
         except RegionRenderError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         return Response(content=content, media_type="image/png", headers={"Content-Disposition": f'attachment; filename="{project_id}-region-{region_id}.png"'})
+
+    @application.post("/api/projects/{project_id}/regions/{region_id}/analysis")
+    def analyze_region(project_id: str, region_id: int, request: RegionAnalysisRequest) -> dict:
+        if region_analysis is None:
+            raise HTTPException(status_code=500, detail="Region analysis unavailable")
+        try:
+            return _analysis_response(region_analysis.analyze(project_id, region_id, request.operation))
+        except (ProjectNotFound, RegionNotFound) as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
 
     return application

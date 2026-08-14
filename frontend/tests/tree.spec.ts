@@ -15,9 +15,11 @@ test.beforeEach(async () => {
 test("preserves full-image transform when selecting YAML region", async ({ page }) => {
   const errors: string[] = [];
   let putCount = 0;
+  let straightenAnalysisCount = 0;
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
   page.on("request", (request) => { if (request.method() === "PUT") putCount += 1; });
+  await page.route("**/api/projects/scan-01/regions/1/analysis", (route) => { const operation = route.request().postDataJSON().operation; if (operation === "straighten") { straightenAnalysisCount += 1; return route.fulfill({ status: 200, contentType: "application/json", body: straightenAnalysisCount === 2 ? JSON.stringify({ suggestion: null, confidence: 0.2, reason: "No stable baseline found" }) : JSON.stringify({ suggestion: 12.3, confidence: 0.94, reason: "Detected baseline" }) }); } return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ suggestion: { top: 20, right: 0, bottom: 10, left: 30 }, confidence: 0.91, reason: "Detected edges" }) }); });
   await page.goto("/");
   expect(errors).toEqual([]);
   const initialRegion = (await (await page.request.get("http://localhost:8000/api/projects/scan-01/regions")).json())[0];
@@ -83,6 +85,18 @@ test("preserves full-image transform when selecting YAML region", async ({ page 
   await expect(page.locator(".straighten-cross")).toBeVisible();
   await expect(page.getByRole("slider", { name: "Straighten angle slider" })).toHaveValue("0");
   await expect(page.getByRole("textbox", { name: "Straighten angle" })).toHaveValue("+0.0");
+  await expect(page.getByRole("button", { name: "Auto", exact: true })).toBeVisible();
+  const putsBeforeAutoStraighten = putCount;
+  await page.getByRole("button", { name: "Auto", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Straighten angle" })).toHaveValue("+12.3");
+  expect(putCount).toBe(putsBeforeAutoStraighten);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Straighten", exact: true }).click();
+  await page.getByRole("button", { name: "Auto", exact: true }).click();
+  await expect(page.locator(".auto-status")).toHaveText("No stable baseline found");
+  await expect(page.getByRole("textbox", { name: "Straighten angle" })).toHaveValue("+0.0");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Straighten", exact: true }).click();
   await page.locator(".straighten-step").last().click();
   await expect(page.getByRole("slider", { name: "Straighten angle slider" })).toHaveValue("0.1");
   await expect(page.getByRole("textbox", { name: "Straighten angle" })).toHaveValue("+0.1");
@@ -112,6 +126,12 @@ test("preserves full-image transform when selecting YAML region", async ({ page 
   await page.getByRole("button", { name: "Straighten", exact: true }).click();
   await expect(page.getByRole("slider", { name: "Straighten angle slider" })).toHaveValue("12.3");
   await expect(page.locator(".image-surface")).toHaveAttribute("style", /rotate\(102\.3deg\)/);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Trim", exact: true }).click();
+  const putsBeforeAutoTrim = putCount;
+  await page.getByRole("button", { name: "Auto", exact: true }).click();
+  await expect(page.locator(".trim-control").filter({ hasText: "Top" }).locator("input")).toHaveValue("20");
+  expect(putCount).toBe(putsBeforeAutoTrim);
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("button", { name: "Trim", exact: true }).click();
   const topTrim = page.locator(".trim-control").filter({ hasText: "Top" });
