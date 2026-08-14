@@ -1,3 +1,6 @@
+help:
+    @just --list
+
 dev:
     #!/usr/bin/env bash
     set -euo pipefail
