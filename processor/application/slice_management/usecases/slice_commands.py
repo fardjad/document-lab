@@ -27,12 +27,12 @@ class SliceCommands:
             self._store.write_project_slices(project_id, updated)
             return created
 
-    def update_slice(self, raw_project_id: str, slice_id: int, name: str, rectangle: CropRectangle, rotation: int) -> CropSlice:
+    def update_slice(self, raw_project_id: str, slice_id: int, name: str, rectangle: CropRectangle, rotation: int, straighten: float) -> CropSlice:
         project_id = self._project_id(raw_project_id)
         name = self._name(name)
         with _SLICE_LOCK:
             current = self._store.read_project_slices(project_id)
-            updated_slice = CropSlice(slice_id, name, rectangle, rotation)
+            updated_slice = CropSlice(slice_id, name, rectangle, rotation, straighten)
             if not any(item.id == slice_id for item in current.slices):
                 raise SliceNotFound("Slice not found")
             updated = ProjectSlices(current.next_slice_id, tuple(updated_slice if item.id == slice_id else item for item in current.slices))

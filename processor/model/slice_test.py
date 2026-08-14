@@ -34,6 +34,14 @@ class SliceModelTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 CropSlice(1, "Slice 1", rectangle, value)  # type: ignore[arg-type]
 
+    def test_straighten_canonicalizes_and_validates(self) -> None:
+        rectangle = CropRectangle(0, 0, 1, 1)
+        self.assertEqual(1.2, CropSlice(1, "Slice 1", rectangle, straighten=1.20000000001).straighten)
+        self.assertEqual(0.0, CropSlice(1, "Slice 1", rectangle, straighten=-0.0).straighten)
+        for value in (45.1, float("inf"), float("nan"), True, "1.0", 1.23):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                CropSlice(1, "Slice 1", rectangle, straighten=value)  # type: ignore[arg-type]
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -41,6 +41,7 @@ class FilesystemSlicesTests(unittest.TestCase):
             self.assertEqual(0, value.slices[0].rotation)
             store.write_project_slices(ProjectId("project"), value)
             self.assertIn("rotation: 0", metadata.read_text())
+            self.assertIn("straighten: 0.0", metadata.read_text())
 
 
 if __name__ == "__main__":

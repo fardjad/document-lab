@@ -46,6 +46,7 @@ class CropSlice:
     name: str
     rectangle: CropRectangle
     rotation: int = 0
+    straighten: float = 0.0
 
     def __post_init__(self) -> None:
         if isinstance(self.id, bool) or not isinstance(self.id, int) or self.id < 1:
@@ -57,6 +58,13 @@ class CropSlice:
         if isinstance(self.rotation, bool) or not isinstance(self.rotation, int) or self.rotation % 90 != 0:
             raise ValueError("Invalid slice rotation")
         object.__setattr__(self, "rotation", self.rotation % 360)
+        if isinstance(self.straighten, bool) or not isinstance(self.straighten, Real) or not math.isfinite(self.straighten) or abs(self.straighten) > 45:
+            raise ValueError("Invalid slice straighten")
+        tenths = round(self.straighten * 10)
+        if abs(self.straighten * 10 - tenths) > 1e-7:
+            raise ValueError("Invalid slice straighten")
+        canonical = round(tenths / 10, 1)
+        object.__setattr__(self, "straighten", 0.0 if canonical == 0 else canonical)
 
 
 @dataclass(frozen=True)
