@@ -40,6 +40,7 @@ body { background: #101317; }
 .parameters { height: 100%; overflow: auto; padding: 16px; }
 .panel-heading { justify-content: space-between; margin-bottom: 12px; }
 .operation-top { display: flex; align-items: center; gap: 8px; }
+.operation.selected { border-color: #c6f36b; background: rgba(198, 243, 107, .1); box-shadow: 0 0 0 1px rgba(198, 243, 107, .35); }
 .operation-top > .MuiBox-root { min-width: 0; }
 .operation.disabled { opacity: .48; }
 .operation.disabled .MuiTypography-root { text-decoration: line-through; }
