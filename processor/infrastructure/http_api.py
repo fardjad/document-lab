@@ -15,6 +15,7 @@ try:
     from application.view.usecases.delete_view import DeleteView
     from application.view.usecases.list_views import ListViews
     from application.view.usecases.create_view import CreateView
+    from application.view.usecases.project_lookup import project_id_or_not_found
     from application.view.usecases.update_view import UpdateView
     from application.view.usecases.render_view import ViewRenderError, RenderView
     from model.operation import Operation
@@ -33,6 +34,7 @@ except ImportError:
     from ..application.view.usecases.delete_view import DeleteView
     from ..application.view.usecases.list_views import ListViews
     from ..application.view.usecases.create_view import CreateView
+    from ..application.view.usecases.project_lookup import project_id_or_not_found
     from ..application.view.usecases.update_view import UpdateView
     from ..application.view.usecases.render_view import ViewRenderError, RenderView
     from ..model.operation import Operation
@@ -81,6 +83,16 @@ def _analysis_response(result) -> dict:
     if isinstance(suggestion, Operation):
         suggestion = {"kind": suggestion.kind, "options": dict(suggestion.options)}
     return {"suggestion": suggestion, "confidence": result.confidence, "reason": result.reason}
+
+
+def _operation_index(usecase, project_id: str, view_id: int, kind: str) -> int:
+    view = usecase.views.read_project_views(project_id_or_not_found(project_id)).find_view(view_id)
+    if view is None:
+        raise ViewNotFound("View not found")
+    for index, operation in enumerate(view.pipeline.operations):
+        if operation.kind == kind:
+            return index
+    return len(view.pipeline.operations)
 
 
 def create_app(
@@ -217,7 +229,8 @@ def create_app(
     @application.post("/api/projects/{project_id}/views/{view_id}/auto/straighten")
     def auto_straighten_view(project_id: str, view_id: int) -> dict:
         try:
-            return _analysis_response(auto_straighten.suggest(project_id, view_id))
+            options = auto_straighten.invoke(project_id, view_id, _operation_index(auto_straighten, project_id, view_id, "straighten"), "auto_straighten", {})
+            return {"suggestion": options.get("angle"), "confidence": None, "reason": None}
         except (ProjectNotFound, ViewNotFound) as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:
@@ -226,7 +239,8 @@ def create_app(
     @application.post("/api/projects/{project_id}/views/{view_id}/auto/trim")
     def auto_trim_view(project_id: str, view_id: int) -> dict:
         try:
-            return _analysis_response(auto_trim.suggest(project_id, view_id))
+            options = auto_trim.invoke(project_id, view_id, _operation_index(auto_trim, project_id, view_id, "trim"), "auto_trim", {})
+            return {"suggestion": {"kind": "trim", "options": options}, "confidence": None, "reason": None}
         except (ProjectNotFound, ViewNotFound) as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:

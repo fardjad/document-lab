@@ -3,9 +3,11 @@ from io import BytesIO
 from PIL import Image
 
 try:
+    from application.view.ports.helper import Helper
     from application.view.ports.rendered_region import RenderedRegion
     from application.view.ports.operation_spec import OperationSpec
 except ImportError:
+    from ....application.view.ports.helper import Helper
     from ....application.view.ports.rendered_region import RenderedRegion
     from ....application.view.ports.operation_spec import OperationSpec
 
@@ -19,9 +21,10 @@ def _trim(options: dict) -> dict:
 
 
 TRIM_SPEC = OperationSpec("trim", {edge: "non-negative int" for edge in ("top", "right", "bottom", "left")}, _trim)
+AUTO_TRIM_INVOCATION_SPEC = OperationSpec("auto_trim", {}, lambda options: {})
 
 
-class TrimExecutor:
+class TrimOperation:
     """Border-trimming executor.
 
     Crops pixels from each edge. Rejects trim that would remove the entire
@@ -30,6 +33,16 @@ class TrimExecutor:
 
     kind = "trim"
     spec = TRIM_SPEC
+
+    def __init__(self, analyzer=None) -> None:
+        self._analyzer = analyzer
+        self.helpers = (Helper("auto_trim", AUTO_TRIM_INVOCATION_SPEC, self._auto_trim),)
+
+    def _auto_trim(self, rendered: RenderedRegion, invocation_options: dict, current_options: dict) -> dict:
+        result = self._analyzer.detect_trim(rendered.image)
+        if result.suggestion is None:
+            return dict(current_options)
+        return dict(result.suggestion.options)
 
     def validate(self, options: dict) -> dict:
         return TRIM_SPEC.validate_options(options)

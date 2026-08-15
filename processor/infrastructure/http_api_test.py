@@ -24,11 +24,11 @@ from application.view.usecases.render_view import RenderView
 from infrastructure.file_store.filesystem_project_source import FilesystemProjectStore
 from infrastructure.image_processor.opencv_view_analyzer import OpenCVDocumentAnalyzer
 from infrastructure.image_processor.operation_registry import OperationRegistryImpl
-from infrastructure.image_processor.operations.remove_background import RemoveBackgroundExecutor
-from infrastructure.image_processor.operations.rotate import RotateExecutor
-from infrastructure.image_processor.operations.straighten import StraightenExecutor
-from infrastructure.image_processor.operations.trim import TrimExecutor
-from infrastructure.image_processor.operations.crop import CropExecutor
+from infrastructure.image_processor.operations.remove_background import RemoveBackgroundOperation
+from infrastructure.image_processor.operations.rotate import RotateOperation
+from infrastructure.image_processor.operations.straighten import StraightenOperation
+from infrastructure.image_processor.operations.trim import TrimOperation
+from infrastructure.image_processor.operations.crop import CropOperation
 
 
 class PassthroughRemover:
@@ -55,9 +55,9 @@ class HttpApiIntegrationTests(unittest.TestCase):
         store = FilesystemProjectStore(root)
         reader = ReadProjectImage(store)
         sizes = ReadProjectImageSize(store)
-        registry = OperationRegistryImpl([RotateExecutor(), StraightenExecutor(), TrimExecutor(), CropExecutor(), RemoveBackgroundExecutor(PassthroughRemover())])
         analyzer = OpenCVDocumentAnalyzer()
-        self.client = TestClient(create_app(ListProjects(store), reader, ["http://test"], CreateProject(store, store), UpdateProject(store, store), DeleteProject(store, store), ImportProject(store, store), ListViews(store), CreateView(store), UpdateView(store, registry), DeleteView(store), RenderView(store, reader, sizes, registry), AutoStraightenView(store, reader, sizes, registry, analyzer), AutoTrimView(store, reader, sizes, registry, analyzer)))
+        registry = OperationRegistryImpl([RotateOperation(), StraightenOperation(analyzer), TrimOperation(analyzer), CropOperation(), RemoveBackgroundOperation(PassthroughRemover())])
+        self.client = TestClient(create_app(ListProjects(store), reader, ["http://test"], CreateProject(store, store), UpdateProject(store, store), DeleteProject(store, store), ImportProject(store, store), ListViews(store), CreateView(store), UpdateView(store, registry), DeleteView(store), RenderView(store, reader, sizes, registry), AutoStraightenView(store, reader, sizes, registry), AutoTrimView(store, reader, sizes, registry)))
 
     def test_project_lifecycle_end_to_end(self) -> None:
         created = self.client.post("/api/projects", params={"project_id": "scan"}, files={"image": ("image.png", png(), "image/png")})

@@ -26,7 +26,7 @@ def _remove_background(options: dict) -> dict:
 REMOVE_BACKGROUND_SPEC = OperationSpec("remove_background", {"model": BACKGROUND_REMOVAL_MODELS}, _remove_background)
 
 
-class RemoveBackgroundExecutor:
+class RemoveBackgroundOperation:
     """Background removal executor.
 
     Validates the background removal option schema (absorbing the old
@@ -36,6 +36,7 @@ class RemoveBackgroundExecutor:
 
     kind = "remove_background"
     spec = REMOVE_BACKGROUND_SPEC
+    helpers = ()
 
     def __init__(self, background_remover=None) -> None:
         self._background_remover = background_remover

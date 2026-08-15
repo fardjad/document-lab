@@ -5,9 +5,11 @@ from numbers import Real
 from PIL import Image
 
 try:
+    from application.view.ports.helper import Helper
     from application.view.ports.rendered_region import RenderedRegion
     from application.view.ports.operation_spec import OperationSpec
 except ImportError:
+    from ....application.view.ports.helper import Helper
     from ....application.view.ports.rendered_region import RenderedRegion
     from ....application.view.ports.operation_spec import OperationSpec
 
@@ -22,8 +24,10 @@ def _straighten(options: dict) -> dict:
 
 STRAIGHTEN_SPEC = OperationSpec("straighten", {"angle": "real, between -45 and 45"}, _straighten)
 
+AUTO_STRAIGHTEN_INVOCATION_SPEC = OperationSpec("auto_straighten", {}, lambda options: {})
 
-class StraightenExecutor:
+
+class StraightenOperation:
     """Fine-angle straightening executor.
 
     Rotates the rendered region by a small angle (up to 45 degrees in tenths)
@@ -32,6 +36,16 @@ class StraightenExecutor:
 
     kind = "straighten"
     spec = STRAIGHTEN_SPEC
+
+    def __init__(self, analyzer=None) -> None:
+        self._analyzer = analyzer
+        self.helpers = (Helper("auto_straighten", AUTO_STRAIGHTEN_INVOCATION_SPEC, self._auto_straighten),)
+
+    def _auto_straighten(self, rendered: RenderedRegion, invocation_options: dict, current_options: dict) -> dict:
+        result = self._analyzer.detect_skew(rendered.image)
+        if result.suggestion is None:
+            return dict(current_options)
+        return {"angle": result.suggestion}
 
     def validate(self, options: dict) -> dict:
         return STRAIGHTEN_SPEC.validate_options(options)

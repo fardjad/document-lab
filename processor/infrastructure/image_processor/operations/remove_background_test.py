@@ -3,7 +3,7 @@ import unittest
 
 from PIL import Image
 
-from infrastructure.image_processor.operations.remove_background import RemoveBackgroundExecutor
+from infrastructure.image_processor.operations.remove_background import RemoveBackgroundOperation
 from application.view.ports.rendered_region import RenderedRegion
 
 
@@ -21,9 +21,9 @@ class PassthroughRemover:
         return image
 
 
-class RemoveBackgroundExecutorTests(unittest.TestCase):
+class RemoveBackgroundOperationTests(unittest.TestCase):
     def test_validate_defaults(self) -> None:
-        result = RemoveBackgroundExecutor().validate({})
+        result = RemoveBackgroundOperation().validate({})
         self.assertEqual("birefnet-general", result["model"])
         self.assertFalse(result["alpha_matting"])
         self.assertEqual(240, result["alpha_matting_foreground_threshold"])
@@ -40,35 +40,35 @@ class RemoveBackgroundExecutorTests(unittest.TestCase):
             "alpha_matting_erode_size": 15,
             "post_process_mask": True,
         }
-        result = RemoveBackgroundExecutor().validate(options)
+        result = RemoveBackgroundOperation().validate(options)
         self.assertEqual(options, result)
 
     def test_validate_rejects_invalid_model(self) -> None:
         with self.assertRaises(ValueError):
-            RemoveBackgroundExecutor().validate({"model": "unknown"})
+            RemoveBackgroundOperation().validate({"model": "unknown"})
 
     def test_validate_rejects_bool_flags_not_bool(self) -> None:
         with self.assertRaises(ValueError):
-            RemoveBackgroundExecutor().validate({"alpha_matting": "yes"})
+            RemoveBackgroundOperation().validate({"alpha_matting": "yes"})
 
     def test_validate_rejects_threshold_out_of_range(self) -> None:
         with self.assertRaises(ValueError):
-            RemoveBackgroundExecutor().validate({"alpha_matting_foreground_threshold": 256})
+            RemoveBackgroundOperation().validate({"alpha_matting_foreground_threshold": 256})
 
     def test_validate_rejects_threshold_bool(self) -> None:
         with self.assertRaises(ValueError):
-            RemoveBackgroundExecutor().validate({"alpha_matting_foreground_threshold": True})
+            RemoveBackgroundOperation().validate({"alpha_matting_foreground_threshold": True})
 
     def test_validate_rejects_erode_out_of_range(self) -> None:
         with self.assertRaises(ValueError):
-            RemoveBackgroundExecutor().validate({"alpha_matting_erode_size": 0})
+            RemoveBackgroundOperation().validate({"alpha_matting_erode_size": 0})
         with self.assertRaises(ValueError):
-            RemoveBackgroundExecutor().validate({"alpha_matting_erode_size": 101})
+            RemoveBackgroundOperation().validate({"alpha_matting_erode_size": 101})
 
     def test_render_with_passthrough_preserves_dimensions(self) -> None:
         region = RenderedRegion(region_bytes(4, 4), 4, 4)
-        executor = RemoveBackgroundExecutor(PassthroughRemover())
-        result = executor.render(region, RemoveBackgroundExecutor().validate({}))
+        executor = RemoveBackgroundOperation(PassthroughRemover())
+        result = executor.render(region, RemoveBackgroundOperation().validate({}))
         self.assertEqual(4, result.width)
         self.assertEqual(4, result.height)
         with Image.open(BytesIO(result.image)) as result_image:
@@ -78,7 +78,7 @@ class RemoveBackgroundExecutorTests(unittest.TestCase):
     def test_render_without_collaborator_is_rejected(self) -> None:
         region = RenderedRegion(region_bytes(4, 4), 4, 4)
         with self.assertRaisesRegex(ValueError, "Background removal unavailable"):
-            RemoveBackgroundExecutor().render(region, {})
+            RemoveBackgroundOperation().render(region, {})
 
 
 if __name__ == "__main__":

@@ -29,7 +29,11 @@ Views do not have crop coordinates as a property. Crop is a pipeline operation (
 
 Pipeline render fold (crop and all operations applied sequentially) stays in the application use case, never as a method on model types.
 
-Each operation plugin owns its own spec, executor, and validator in the same infrastructure module (e.g. `rotate.py` defines both `RotateExecutor` and the rotate validation). There is no central spec file. The application layer `OperationSpecRegistry` port resolves specs by kind; `UpdateView` validates options through this port without importing image libraries.
+Each operation plugin owns its own spec, operation, and validator in the same infrastructure module (e.g. `rotate.py` defines both `RotateOperation` and the rotate validation). There is no central spec file. The application layer `OperationSpecRegistry` port resolves specs by kind; `UpdateView` validates options through this port without importing image libraries.
+
+A helper is a plugin-provided function for an operation kind with its own invocation options. It takes the rendered image at the operation's pipeline position plus invocation options and current operation options, and returns updated operation options. Helpers are owned by operations (zero or more per operation) and accessed via the operation's helpers tuple, not a separate registry. Auto-detection features (auto-straighten, auto-trim) are implemented as helpers on their respective operation plugins.
+
+If a future auto-action needs to affect multiple operations, make one meta-operation whose options encapsulate the sub-operations' options. The helper returns updated meta-operation options, and the meta-operation's executor passes them down to sub-operations. This keeps the helper contract simple: one operation in, one operation options out.
 
 ### Infrastructure and config
 

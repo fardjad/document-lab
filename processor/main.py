@@ -17,12 +17,12 @@ try:
     from .infrastructure.file_store.filesystem_project_source import FilesystemProjectStore
     from .infrastructure.http_api import create_app
     from .infrastructure.image_processor.opencv_view_analyzer import OpenCVDocumentAnalyzer
-    from .infrastructure.image_processor.operations.remove_background import RemoveBackgroundExecutor
-    from .infrastructure.image_processor.operations.rotate import RotateExecutor
-    from .infrastructure.image_processor.operations.straighten import StraightenExecutor
-    from .infrastructure.image_processor.operations.trim import TrimExecutor
+    from .infrastructure.image_processor.operations.remove_background import RemoveBackgroundOperation
+    from .infrastructure.image_processor.operations.rotate import RotateOperation
+    from .infrastructure.image_processor.operations.straighten import StraightenOperation
+    from .infrastructure.image_processor.operations.trim import TrimOperation
     from .infrastructure.image_processor.operation_registry import OperationRegistryImpl
-    from .infrastructure.image_processor.operations.crop import CropExecutor
+    from .infrastructure.image_processor.operations.crop import CropOperation
     from .infrastructure.image_processor.rembg_background_remover import RembgBackgroundRemover
 except ImportError:
     from application.auto_processing.usecases.auto_straighten_view import AutoStraightenView
@@ -43,26 +43,28 @@ except ImportError:
     from infrastructure.file_store.filesystem_project_source import FilesystemProjectStore
     from infrastructure.http_api import create_app
     from infrastructure.image_processor.opencv_view_analyzer import OpenCVDocumentAnalyzer
-    from infrastructure.image_processor.operations.remove_background import RemoveBackgroundExecutor
-    from infrastructure.image_processor.operations.rotate import RotateExecutor
-    from infrastructure.image_processor.operations.straighten import StraightenExecutor
-    from infrastructure.image_processor.operations.trim import TrimExecutor
+    from infrastructure.image_processor.operations.remove_background import RemoveBackgroundOperation
+    from infrastructure.image_processor.operations.rotate import RotateOperation
+    from infrastructure.image_processor.operations.straighten import StraightenOperation
+    from infrastructure.image_processor.operations.trim import TrimOperation
     from infrastructure.image_processor.operation_registry import OperationRegistryImpl
-    from infrastructure.image_processor.operations.crop import CropExecutor
+    from infrastructure.image_processor.operations.crop import CropOperation
     from infrastructure.image_processor.rembg_background_remover import RembgBackgroundRemover
 
 
 settings = Settings.from_environment()
 store = FilesystemProjectStore(settings.project_root)
 background_remover = RembgBackgroundRemover()
-registry = OperationRegistryImpl([
-    RotateExecutor(),
-    StraightenExecutor(),
-    TrimExecutor(),
-    CropExecutor(),
-    RemoveBackgroundExecutor(background_remover),
-])
 analyzer = OpenCVDocumentAnalyzer()
+straighten = StraightenOperation(analyzer)
+trim = TrimOperation(analyzer)
+registry = OperationRegistryImpl([
+    RotateOperation(),
+    straighten,
+    trim,
+    CropOperation(),
+    RemoveBackgroundOperation(background_remover),
+])
 list_projects = ListProjects(store)
 read_project_image = ReadProjectImage(store)
 read_project_image_size = ReadProjectImageSize(store)
@@ -79,6 +81,6 @@ app = create_app(
     UpdateView(store, registry),
     DeleteView(store),
     RenderView(store, read_project_image, read_project_image_size, registry),
-    AutoStraightenView(store, read_project_image, read_project_image_size, registry, analyzer),
-    AutoTrimView(store, read_project_image, read_project_image_size, registry, analyzer),
+    AutoStraightenView(store, read_project_image, read_project_image_size, registry),
+    AutoTrimView(store, read_project_image, read_project_image_size, registry),
 )

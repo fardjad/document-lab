@@ -20,7 +20,7 @@ def _rotate(options: dict) -> dict:
 ROTATE_SPEC = OperationSpec("rotate", {"degrees": "int, multiple of 90"}, _rotate)
 
 
-class RotateExecutor:
+class RotateOperation:
     """Quarter-turn rotation executor.
 
     Rotates the rendered region by a multiple of 90 degrees. Odd quarters
@@ -29,6 +29,7 @@ class RotateExecutor:
 
     kind = "rotate"
     spec = ROTATE_SPEC
+    helpers = ()
 
     def validate(self, options: dict) -> dict:
         return ROTATE_SPEC.validate_options(options)

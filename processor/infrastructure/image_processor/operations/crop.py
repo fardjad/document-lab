@@ -25,9 +25,10 @@ def validate_crop(options: dict) -> dict:
 CROP_SPEC = OperationSpec("crop", {key: "finite real, normalized" for key in ("x", "y", "width", "height")}, validate_crop)
 
 
-class CropExecutor:
+class CropOperation:
     kind = "crop"
     spec = CROP_SPEC
+    helpers = ()
 
     def validate(self, options: dict) -> dict:
         return CROP_SPEC.validate_options(options)
