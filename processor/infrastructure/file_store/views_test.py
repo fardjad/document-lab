@@ -24,13 +24,14 @@ class FilesystemViewsTests(unittest.TestCase):
             self._project(root)
             store = FilesystemProjectStore(root)
             self.assertEqual(Project(ProjectId("project"), ProjectImage(b"")), store.read_project_views(ProjectId("project")))
-            pipeline = Pipeline((Operation("rotate", {"degrees": 90}), Operation("straighten", {"angle": 1.5}), Operation("trim", {"top": 2, "right": 0, "bottom": 0, "left": 3}), Operation("remove_background", {"model": "u2net"})))
+            pipeline = Pipeline((Operation("rotate", {"degrees": 90}), Operation("straighten", {"angle": 1.5}, False), Operation("trim", {"top": 2, "right": 0, "bottom": 0, "left": 3}), Operation("remove_background", {"model": "u2net"})))
             value = Project(ProjectId("project"), ProjectImage(b""), 2, (View(1, "Region 1", pipeline),))
             store.write_project_views(ProjectId("project"), value)
             self.assertEqual(value, store.read_project_views(ProjectId("project")))
             text = (root / "project" / "project.yaml").read_text()
             self.assertIn("version: 4", text)
             self.assertIn("pipeline:", text)
+            self.assertIn("enabled: false", text)
 
     def test_empty_pipeline_round_trips(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

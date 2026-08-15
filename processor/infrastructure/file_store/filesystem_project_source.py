@@ -144,13 +144,14 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
             raise ValueError
         operations = []
         for entry in raw:
-            if not isinstance(entry, dict) or set(entry) != {"kind", "options"}:
+            if not isinstance(entry, dict) or not set(entry).issubset({"kind", "options", "enabled"}) or set(entry) < {"kind", "options"}:
                 raise ValueError
             kind = entry["kind"]
             options = entry["options"]
             if not isinstance(kind, str) or not kind or not isinstance(options, dict):
                 raise ValueError
-            operations.append(Operation(kind, options))
+            enabled = entry.get("enabled", True)
+            operations.append(Operation(kind, options, enabled))
         return Pipeline(tuple(operations))
 
     def write_project_views(self, project_id: ProjectId, project: Project) -> None:
@@ -162,7 +163,7 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
                 {
                     "id": item.id,
                     "name": item.name,
-                    "pipeline": [{"kind": op.kind, "options": dict(op.options)} for op in item.pipeline.operations],
+                    "pipeline": [{"kind": op.kind, "options": dict(op.options), "enabled": op.enabled} for op in item.pipeline.operations],
                 }
                 for item in project.views
             ],

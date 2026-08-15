@@ -45,6 +45,7 @@ class OperationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: str
     options: dict
+    enabled: bool = True
 
 
 class CreateViewRequest(BaseModel):
@@ -65,14 +66,14 @@ class PreviewRequest(BaseModel):
 
 
 def _pipeline(request: list[OperationRequest]) -> Pipeline:
-    return Pipeline(tuple(Operation(op.kind, dict(op.options)) for op in request))
+    return Pipeline(tuple(Operation(op.kind, dict(op.options), op.enabled) for op in request))
 
 
 def _view_response(item) -> dict:
     return {
         "id": item.id,
         "name": item.name,
-        "pipeline": [{"kind": op.kind, "options": dict(op.options)} for op in item.pipeline.operations],
+        "pipeline": [{"kind": op.kind, "options": dict(op.options), "enabled": op.enabled} for op in item.pipeline.operations],
     }
 
 
@@ -88,7 +89,7 @@ def _operation_index(usecase, project_id: str, view_id: int, kind: str) -> int:
     if view is None:
         raise ViewNotFound("View not found")
     for index, operation in enumerate(view.pipeline.operations):
-        if operation.kind == kind:
+        if operation.kind == kind and operation.enabled:
             return index
     return len(view.pipeline.operations)
 

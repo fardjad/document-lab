@@ -85,6 +85,20 @@ class RenderViewTests(unittest.TestCase):
         self.assertEqual({"model": "u2net"}, executor.render_calls[0][1])
         self.assertTrue(result.startswith(b"source"))
 
+    def test_render_skips_disabled_operations(self) -> None:
+        executor = RecordingExecutor()
+        registry = FakeRegistry(executor)
+        view_store = FakeViewStore()
+        view_store.read_project_views = lambda project_id: Project(
+            ProjectId("project"),
+            ProjectImage(b""),
+            2,
+            (View(1, "x", Pipeline((Operation("rotate", {"degrees": 90}, False), Operation("trim", {"top": 1})))),),
+        )
+        result = RenderView(view_store, FakeReader(), FakeImageSizes(), registry).render("project", 1)
+        self.assertEqual(1, len(executor.render_calls))
+        self.assertEqual(b"source_{'top': 1}", result)
+
     def test_missing_view_and_project_are_reported(self) -> None:
         usecase = RenderView(FakeViewStore(), FakeReader(), FakeImageSizes(), FakeRegistry(RecordingExecutor()))
         with self.assertRaises(ViewNotFound):

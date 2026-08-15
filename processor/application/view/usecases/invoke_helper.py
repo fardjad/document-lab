@@ -40,18 +40,22 @@ class InvokeHelper:
             raise ValueError("Invalid operation index")
         if operation_index < 0 or operation_index > len(operations):
             raise ValueError("Operation index out of range")
+        target_operation = operations[operation_index] if operation_index < len(operations) else None
+        if target_operation is not None and not target_operation.enabled:
+            raise ValueError("Cannot invoke helper for disabled operation")
 
         image = self.image_reader.read(raw_project_id)
         width, height = self.image_sizes.read(raw_project_id)
         rendered = RenderedRegion(image.data, width, height)
         for operation in operations[:operation_index]:
+            if not operation.enabled:
+                continue
             rendered = self.registry.get(operation.kind).render(rendered, operation.options)
 
-        operation = operations[operation_index] if operation_index < len(operations) else None
-        registered = self.registry.get(operation.kind if operation is not None else helper_name.removeprefix("auto_"))
+        registered = self.registry.get(target_operation.kind if target_operation is not None else helper_name.removeprefix("auto_"))
         try:
             helper = next(helper for helper in registered.helpers if helper.name == helper_name)
         except StopIteration as error:
             raise ValueError(f"Unknown helper: {helper_name}") from error
         validated_options = helper.invocation_spec.validate_options(invocation_options)
-        return helper.invoke(rendered, validated_options, operation.options if operation is not None else {})
+        return helper.invoke(rendered, validated_options, target_operation.options if target_operation is not None else {})

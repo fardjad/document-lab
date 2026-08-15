@@ -12,10 +12,13 @@ class Operation:
 
     kind: str
     options: dict = field(default_factory=dict)
+    enabled: bool = True
 
     def __post_init__(self) -> None:
         if not isinstance(self.kind, str) or not self.kind:
             raise ValueError("Invalid operation kind")
         if not isinstance(self.options, dict):
             raise ValueError("Invalid operation options")
+        if not isinstance(self.enabled, bool):
+            raise ValueError("Invalid operation enabled flag")
         object.__setattr__(self, "options", dict(self.options))

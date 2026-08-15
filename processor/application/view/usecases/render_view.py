@@ -49,6 +49,8 @@ class RenderView:
             width, height = size
             rendered = RenderedRegion(image.data, width, height)
             for op in view.pipeline.operations:
+                if not op.enabled:
+                    continue
                 rendered = self._registry.get(op.kind).render(rendered, op.options)
             return rendered.image
         except (ProjectNotFound, ViewNotFound):

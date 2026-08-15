@@ -12,6 +12,14 @@ class OperationTests(unittest.TestCase):
     def test_defaults_to_empty_options(self) -> None:
         op = Operation("trim")
         self.assertEqual({}, op.options)
+        self.assertTrue(op.enabled)
+
+    def test_can_be_disabled(self) -> None:
+        self.assertFalse(Operation("trim", enabled=False).enabled)
+
+    def test_rejects_non_bool_enabled(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Invalid operation enabled flag"):
+            Operation("trim", enabled=1)  # type: ignore[arg-type]
 
     def test_rejects_empty_kind(self) -> None:
         with self.assertRaisesRegex(ValueError, "Invalid operation kind"):
