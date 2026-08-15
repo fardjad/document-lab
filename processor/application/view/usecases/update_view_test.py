@@ -27,6 +27,14 @@ class FakeViewStore:
         self.value = views
 
 
+class FakeCache:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def cleanup_view(self, project_id, view_id, valid_keys):
+        self.calls.append((project_id, view_id, valid_keys))
+
+
 class AcceptingExecutor:
     kind = "accepting"
 
@@ -89,6 +97,15 @@ class UpdateViewTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid option"):
             UpdateView(store, FakeRegistry(FailingValidateExecutor())).update("project", 1, "x", pipeline)
         self.assertEqual("Region 1", store.value.find_view(1).name)
+
+    def test_cleans_stale_cache_entries_after_save(self) -> None:
+        store = FakeViewStore()
+        cache = FakeCache()
+        pipeline = Pipeline((Operation("rotate", {"degrees": 90}), Operation("trim", {"top": 1})))
+        UpdateView(store, FakeRegistry(AcceptingExecutor()), cache).update("project", 1, "x", pipeline)
+        self.assertEqual("project", cache.calls[0][0].value)
+        self.assertEqual(1, cache.calls[0][1])
+        self.assertEqual(2, len(cache.calls[0][2]))
 
 
 if __name__ == "__main__":

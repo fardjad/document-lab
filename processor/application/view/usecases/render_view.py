@@ -67,13 +67,13 @@ class RenderView:
                 if not op.enabled:
                     continue
                 if use_cache and self._cache is not None:
-                    cached = self._cache.get(project_id, cache_key_for_step(view.pipeline.operations, step))
+                    cached = self._cache.get(project_id, view.id, cache_key_for_step(view.pipeline.operations, step))
                     if cached is not None:
                         rendered = cached
                         continue
                 rendered = self._registry.get(op.kind).render(rendered, op.options)
                 if use_cache and self._cache is not None:
-                    self._cache.put(project_id, cache_key_for_step(view.pipeline.operations, step), rendered)
+                    self._cache.put(project_id, view.id, cache_key_for_step(view.pipeline.operations, step), rendered)
             return rendered.image
         except (ProjectNotFound, ViewNotFound):
             raise

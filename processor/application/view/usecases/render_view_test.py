@@ -72,13 +72,13 @@ class RecordingCache:
         self.put_calls = []
         self.values = {}
 
-    def get(self, project_id: ProjectId, cache_key: str):
-        self.get_calls.append((project_id, cache_key))
-        return self.values.get((project_id, cache_key))
+    def get(self, project_id: ProjectId, view_id: int, cache_key: str):
+        self.get_calls.append((project_id, view_id, cache_key))
+        return self.values.get((project_id, view_id, cache_key))
 
-    def put(self, project_id: ProjectId, cache_key: str, rendered: RenderedRegion) -> None:
-        self.put_calls.append((project_id, cache_key, rendered))
-        self.values[(project_id, cache_key)] = rendered
+    def put(self, project_id: ProjectId, view_id: int, cache_key: str, rendered: RenderedRegion) -> None:
+        self.put_calls.append((project_id, view_id, cache_key, rendered))
+        self.values[(project_id, view_id, cache_key)] = rendered
 
     def cleanup(self, project_id: ProjectId) -> None:
         pass

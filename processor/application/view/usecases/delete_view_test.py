@@ -17,6 +17,14 @@ class FakeViewStore:
         self.value = views
 
 
+class FakeCache:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def cleanup_view(self, project_id, view_id, valid_keys):
+        self.calls.append((project_id, view_id, valid_keys))
+
+
 class DeleteViewTests(unittest.TestCase):
     def test_removes_view_and_keeps_next_id(self) -> None:
         store = FakeViewStore()
@@ -31,6 +39,11 @@ class DeleteViewTests(unittest.TestCase):
     def test_rejects_invalid_project_id(self) -> None:
         with self.assertRaises(ProjectNotFound):
             DeleteView(FakeViewStore()).delete("../nope", 1)
+
+    def test_clears_deleted_view_cache(self) -> None:
+        cache = FakeCache()
+        DeleteView(FakeViewStore(), cache).delete("project", 1)
+        self.assertEqual([(ProjectId("project"), 1, set())], cache.calls)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 try:
     from application.view.ports.operation_registry import OperationSpecRegistry
+    from application.view.ports.render_cache import RenderCache
+    from application.view.usecases.render_view import cache_key_for_step
     from application.view.ports.view_store import ProjectViewStore
     from application.view.usecases.project_lookup import project_id_or_not_found
     from application.view.usecases.view_lock import view_write_lock
@@ -7,6 +9,8 @@ try:
     from model.view import View, ViewNotFound
 except ImportError:
     from ..ports.operation_registry import OperationSpecRegistry
+    from ..ports.render_cache import RenderCache
+    from .render_view import cache_key_for_step
     from ..ports.view_store import ProjectViewStore
     from .project_lookup import project_id_or_not_found
     from .view_lock import view_write_lock
@@ -23,9 +27,10 @@ class UpdateView:
     executor before persisting.
     """
 
-    def __init__(self, views: ProjectViewStore, registry: OperationSpecRegistry) -> None:
+    def __init__(self, views: ProjectViewStore, registry: OperationSpecRegistry, cache: RenderCache | None = None) -> None:
         self._views = views
         self._registry = registry
+        self._cache = cache
 
     def update(self, raw_project_id: str, view_id: int, name: str, pipeline: Pipeline) -> View:
         project_id = project_id_or_not_found(raw_project_id)
@@ -37,4 +42,10 @@ class UpdateView:
             if current.find_view(view_id) is None:
                 raise ViewNotFound("View not found")
             self._views.write_project_views(project_id, current.replace_view(updated_view))
+            if self._cache is not None:
+                valid_keys = {
+                    cache_key_for_step(pipeline.operations, step)
+                    for step in range(len(pipeline.operations))
+                }
+                self._cache.cleanup_view(project_id, view_id, valid_keys)
             return updated_view

@@ -29,40 +29,53 @@ class FileRenderCacheTests(unittest.TestCase):
         self.root = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: __import__("shutil").rmtree(self.root))
         self.project_id = ProjectId("project")
+        self.view_id = 7
         self.cache = FileRenderCache(self.root, ttl_seconds=60)
 
     def test_get_returns_none_when_cache_file_does_not_exist(self) -> None:
-        self.assertIsNone(self.cache.get(self.project_id, "missing"))
+        self.assertIsNone(self.cache.get(self.project_id, self.view_id, "missing"))
 
     def test_put_writes_png_and_get_returns_region_with_header_dimensions(self) -> None:
         image = png_bytes(3, 2)
         rendered = RenderedRegion(image, 3, 2)
 
-        self.cache.put(self.project_id, "step", rendered)
+        self.cache.put(self.project_id, self.view_id, "step", rendered)
 
-        path = self.root / "project" / "cache" / "step.png"
+        path = self.root / "project" / "cache" / "7-step.png"
         self.assertTrue(path.is_file())
-        self.assertEqual(rendered, self.cache.get(self.project_id, "step"))
+        self.assertEqual(rendered, self.cache.get(self.project_id, self.view_id, "step"))
 
     def test_get_deletes_and_returns_none_for_stale_file(self) -> None:
-        path = self.root / "project" / "cache" / "step.png"
-        self.cache.put(self.project_id, "step", RenderedRegion(png_bytes(1, 1), 1, 1))
+        path = self.root / "project" / "cache" / "7-step.png"
+        self.cache.put(self.project_id, self.view_id, "step", RenderedRegion(png_bytes(1, 1), 1, 1))
         old = time.time() - 120
         os.utime(path, (old, old))
 
-        self.assertIsNone(self.cache.get(self.project_id, "step"))
+        self.assertIsNone(self.cache.get(self.project_id, self.view_id, "step"))
         self.assertFalse(path.exists())
 
     def test_cleanup_deletes_stale_files_and_keeps_fresh_files(self) -> None:
-        self.cache.put(self.project_id, "stale", RenderedRegion(png_bytes(1, 1), 1, 1))
-        self.cache.put(self.project_id, "fresh", RenderedRegion(png_bytes(1, 1), 1, 1))
-        stale_path = self.root / "project" / "cache" / "stale.png"
+        self.cache.put(self.project_id, self.view_id, "stale", RenderedRegion(png_bytes(1, 1), 1, 1))
+        self.cache.put(self.project_id, self.view_id, "fresh", RenderedRegion(png_bytes(1, 1), 1, 1))
+        stale_path = self.root / "project" / "cache" / "7-stale.png"
         os.utime(stale_path, (time.time() - 120, time.time() - 120))
 
         self.cache.cleanup(self.project_id)
 
         self.assertFalse(stale_path.exists())
-        self.assertTrue((self.root / "project" / "cache" / "fresh.png").exists())
+        self.assertTrue((self.root / "project" / "cache" / "7-fresh.png").exists())
+
+    def test_cleanup_view_deletes_invalid_keys_only_for_view(self) -> None:
+        image = RenderedRegion(png_bytes(1, 1), 1, 1)
+        self.cache.put(self.project_id, 7, "keep", image)
+        self.cache.put(self.project_id, 7, "remove", image)
+        self.cache.put(self.project_id, 8, "other", image)
+
+        self.cache.cleanup_view(self.project_id, 7, {"keep"})
+
+        self.assertTrue((self.root / "project" / "cache" / "7-keep.png").exists())
+        self.assertFalse((self.root / "project" / "cache" / "7-remove.png").exists())
+        self.assertTrue((self.root / "project" / "cache" / "8-other.png").exists())
 
 
 if __name__ == "__main__":
