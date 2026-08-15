@@ -71,7 +71,10 @@ function Preview({ project, view, pipeline, activeEditing }: { project?: Project
     if (!viewer || !image || !image.naturalWidth || !image.naturalHeight) { setZoom(nextZoom ?? 1); setPan({ x: 0, y: 0 }); return; }
     const containerWidth = viewer.clientWidth;
     const containerHeight = viewer.clientHeight;
-    const targetZoom = nextZoom ?? Math.min(containerWidth / image.naturalWidth, containerHeight / image.naturalHeight);
+    const padding = 24;
+    const availableWidth = containerWidth - padding * 2;
+    const availableHeight = containerHeight - padding * 2;
+    const targetZoom = nextZoom ?? Math.min(availableWidth / image.naturalWidth, availableHeight / image.naturalHeight);
     setZoom(targetZoom);
     setPan({ x: (containerWidth - image.naturalWidth * targetZoom) / 2, y: (containerHeight - image.naturalHeight * targetZoom) / 2 });
   };
