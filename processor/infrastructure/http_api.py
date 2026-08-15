@@ -47,25 +47,25 @@ class OperationRequest(BaseModel):
     options: dict
 
 
-class PipelineRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    operations: list[OperationRequest]
-
-
 class CreateViewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
-    pipeline: PipelineRequest | None = None
+    pipeline: list[OperationRequest] | None = None
 
 
 class UpdateViewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
-    pipeline: PipelineRequest
+    pipeline: list[OperationRequest]
 
 
-def _pipeline(request: PipelineRequest) -> Pipeline:
-    return Pipeline(tuple(Operation(op.kind, dict(op.options)) for op in request.operations))
+class PreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    pipeline: list[OperationRequest]
+
+
+def _pipeline(request: list[OperationRequest]) -> Pipeline:
+    return Pipeline(tuple(Operation(op.kind, dict(op.options)) for op in request))
 
 
 def _view_response(item) -> dict:
@@ -212,9 +212,9 @@ def create_app(
         return Response(content=content, media_type="image/png", headers={"Content-Disposition": f'attachment; filename="{project_id}-view-{view_id}.png"'})
 
     @application.post("/api/projects/{project_id}/views/{view_id}/render")
-    def preview_view(project_id: str, view_id: int, request: PipelineRequest) -> Response:
+    def preview_view(project_id: str, view_id: int, request: PreviewRequest) -> Response:
         try:
-            content = render_view.preview(project_id, view_id, _pipeline(request))
+            content = render_view.preview(project_id, view_id, _pipeline(request.pipeline))
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ViewNotFound as error:

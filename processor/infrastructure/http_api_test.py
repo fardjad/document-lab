@@ -86,14 +86,14 @@ class HttpApiIntegrationTests(unittest.TestCase):
         view = self.client.post("/api/projects/scan/views", json={"name": "Card"}).json()
         self.assertEqual(1, view["id"])
         self.assertEqual(PIPELINE, view["pipeline"])
-        body = {"name": "Card", "pipeline": {"operations": [{"kind": "rotate", "options": {"degrees": 90}}, {"kind": "straighten", "options": {"angle": 1.5}}, {"kind": "trim", "options": {"top": 2, "right": 0, "bottom": 1, "left": 0}}, {"kind": "remove_background", "options": {"model": "u2net", "alpha_matting": False, "alpha_matting_foreground_threshold": 240, "alpha_matting_background_threshold": 10, "alpha_matting_erode_size": 10, "post_process_mask": False}}]}}
+        body = {"name": "Card", "pipeline": [{"kind": "rotate", "options": {"degrees": 90}}, {"kind": "straighten", "options": {"angle": 1.5}}, {"kind": "trim", "options": {"top": 2, "right": 0, "bottom": 1, "left": 0}}, {"kind": "remove_background", "options": {"model": "u2net", "alpha_matting": False, "alpha_matting_foreground_threshold": 240, "alpha_matting_background_threshold": 10, "alpha_matting_erode_size": 10, "post_process_mask": False}}]}
         updated = self.client.put("/api/projects/scan/views/1", json=body)
         self.assertEqual(200, updated.status_code)
         persisted = self.client.get("/api/projects/scan/views").json()[0]
-        self.assertEqual(body["pipeline"]["operations"], persisted["pipeline"])
-        invalid = self.client.put("/api/projects/scan/views/1", json={"name": "Card", "pipeline": {"operations": [{"kind": "rotate", "options": {"degrees": 45}}, {"kind": "trim", "options": {"top": 0, "right": 0, "bottom": 0, "left": 0}}]}})
+        self.assertEqual(body["pipeline"], persisted["pipeline"])
+        invalid = self.client.put("/api/projects/scan/views/1", json={"name": "Card", "pipeline": [{"kind": "rotate", "options": {"degrees": 45}}, {"kind": "trim", "options": {"top": 0, "right": 0, "bottom": 0, "left": 0}}]})
         self.assertEqual(422, invalid.status_code)
-        extra = self.client.put("/api/projects/scan/views/1", json={"name": "Card", "pipeline": {"operations": [{"kind": "rotate", "options": {"degrees": 90}, "unknown": True}]}})
+        extra = self.client.put("/api/projects/scan/views/1", json={"name": "Card", "pipeline": [{"kind": "rotate", "options": {"degrees": 90}, "unknown": True}]})
         self.assertEqual(422, extra.status_code)
         self.assertEqual(404, self.client.delete("/api/projects/scan/views/9").status_code)
         self.assertEqual(204, self.client.delete("/api/projects/scan/views/1").status_code)
@@ -108,13 +108,13 @@ class HttpApiIntegrationTests(unittest.TestCase):
         self.assertIn("attachment", download.headers["content-disposition"])
         with Image.open(BytesIO(download.content)) as image:
             self.assertEqual((120, 90), image.size)
-        preview = self.client.post("/api/projects/scan/views/1/render", json={"operations": [{"kind": "crop", "options": {"x": 0, "y": 0, "width": 0.5, "height": 0.5555555555555556}}, {"kind": "rotate", "options": {"degrees": 90}}]})
+        preview = self.client.post("/api/projects/scan/views/1/render", json={"pipeline": [{"kind": "crop", "options": {"x": 0, "y": 0, "width": 0.5, "height": 0.5555555555555556}}, {"kind": "rotate", "options": {"degrees": 90}}]})
         self.assertEqual(200, preview.status_code)
         self.assertNotIn("content-disposition", preview.headers)
         with Image.open(BytesIO(preview.content)) as image:
             self.assertEqual((50, 60), image.size)
         self.assertEqual(404, self.client.get("/api/projects/scan/views/9/render").status_code)
-        oversize = self.client.post("/api/projects/scan/views/1/render", json={"operations": [{"kind": "trim", "options": {"top": 500, "right": 0, "bottom": 0, "left": 0}}]})
+        oversize = self.client.post("/api/projects/scan/views/1/render", json={"pipeline": [{"kind": "trim", "options": {"top": 500, "right": 0, "bottom": 0, "left": 0}}]})
         self.assertEqual(422, oversize.status_code)
 
     def test_auto_straighten_and_trim_suggestions(self) -> None:
