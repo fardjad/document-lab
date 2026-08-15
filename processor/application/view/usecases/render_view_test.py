@@ -137,6 +137,16 @@ class RenderViewTests(unittest.TestCase):
         self.assertEqual({"model": "u2net"}, executor.render_calls[0][1])
         self.assertTrue(result.startswith(b"source"))
 
+    def test_preview_bypasses_cache(self) -> None:
+        executor = RecordingExecutor()
+        cache = RecordingCache()
+        usecase = RenderView(FakeViewStore(), FakeReader(), FakeImageSizes(), FakeRegistry(executor), cache)
+
+        usecase.preview("project", 1, Pipeline((Operation("rotate", {"degrees": 90}),)))
+
+        self.assertEqual([], cache.get_calls)
+        self.assertEqual([], cache.put_calls)
+
     def test_render_skips_disabled_operations(self) -> None:
         executor = RecordingExecutor()
         registry = FakeRegistry(executor)
