@@ -9,14 +9,14 @@ test.beforeEach(async () => {
   await cp(fixtureRoot, projectsRoot, { recursive: true });
 });
 
-test("creates a region through the viewer and rotates it via the pipeline contract", async ({ page }) => {
+test("creates a view through the viewer and rotates it via the pipeline contract", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
   await page.goto("/");
   await expect(page.getByRole("treeitem", { name: "scan-01" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Create region" }).click();
+  await page.getByRole("button", { name: "Create view" }).click();
   const viewport = page.locator("section.viewer");
   const box = await viewport.boundingBox();
   expect(box).not.toBeNull();
@@ -26,13 +26,13 @@ test("creates a region through the viewer and rotates it via the pipeline contra
   await page.mouse.down();
   await page.mouse.move(startX + 120, startY + 90, { steps: 8 });
   await page.mouse.up();
-  await page.getByRole("button", { name: "Confirm region" }).click();
-  await expect(page.getByRole("treeitem", { name: "Region 2" })).toBeVisible();
+  await page.getByRole("button", { name: "Confirm view" }).click();
+  await expect(page.getByRole("treeitem", { name: "View 2" })).toBeVisible();
 
-  const responsePromise = page.waitForResponse((item) => item.url().includes("/regions/") && item.request().method() === "PUT" && item.status() === 200, { timeout: 5000 });
-  await page.getByRole("button", { name: "Rotate region right 90 degrees" }).click();
+  const responsePromise = page.waitForResponse((item) => item.url().includes("/views/") && item.request().method() === "PUT" && item.status() === 200, { timeout: 5000 });
+  await page.getByRole("button", { name: "Rotate view right 90 degrees" }).click();
   const response = await responsePromise.catch(() => null);
   expect(response?.status()).toBe(200);
-  await expect(page.getByRole("button", { name: "Rotate region right 90 degrees" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Rotate view right 90 degrees" })).toBeEnabled();
   expect(errors).toEqual([]);
 });

@@ -6,12 +6,12 @@ from infrastructure.file_store.filesystem_project_source import FilesystemProjec
 from model.operation import Operation
 from model.pipeline import Pipeline
 from model.project import ProjectId, ProjectImage, ProjectNotFound
-from model.region import CropRectangle, CropRegion, ProjectRegions
+from model.view import ProjectViews, View
 
 PNG_HEADER = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\x0dIHDR" + b"\x00\x00\x00\x01\x00\x00\x00\x01" + b"\x08\x06\x00\x00\x00"
 
 
-class FilesystemRegionsTests(unittest.TestCase):
+class FilesystemViewsTests(unittest.TestCase):
     def _project(self, root: Path) -> Path:
         project = root / "project"
         project.mkdir()
@@ -22,13 +22,13 @@ class FilesystemRegionsTests(unittest.TestCase):
             root = Path(directory)
             self._project(root)
             store = FilesystemProjectStore(root)
-            self.assertEqual(ProjectRegions(1), store.read_project_regions(ProjectId("project")))
+            self.assertEqual(ProjectViews(1), store.read_project_views(ProjectId("project")))
             pipeline = Pipeline((Operation("rotate", {"degrees": 90}), Operation("straighten", {"angle": 1.5}), Operation("trim", {"top": 2, "right": 0, "bottom": 0, "left": 3}), Operation("remove_background", {"model": "u2net"})))
-            value = ProjectRegions(2, (CropRegion(1, "Region 1", CropRectangle(1, 2, 3, 4), pipeline),))
-            store.write_project_regions(ProjectId("project"), value)
-            self.assertEqual(value, store.read_project_regions(ProjectId("project")))
+            value = ProjectViews(2, (View(1, "Region 1", pipeline),))
+            store.write_project_views(ProjectId("project"), value)
+            self.assertEqual(value, store.read_project_views(ProjectId("project")))
             text = (root / "project" / "project.yaml").read_text()
-            self.assertIn("version: 3", text)
+            self.assertIn("version: 4", text)
             self.assertIn("pipeline:", text)
 
     def test_empty_pipeline_round_trips(self) -> None:
@@ -36,9 +36,9 @@ class FilesystemRegionsTests(unittest.TestCase):
             root = Path(directory)
             self._project(root)
             store = FilesystemProjectStore(root)
-            value = ProjectRegions(2, (CropRegion(1, "Region 1", CropRectangle(0, 0, 1, 1), Pipeline()),))
-            store.write_project_regions(ProjectId("project"), value)
-            self.assertEqual(value, store.read_project_regions(ProjectId("project")))
+            value = ProjectViews(2, (View(1, "Region 1", Pipeline()),))
+            store.write_project_views(ProjectId("project"), value)
+            self.assertEqual(value, store.read_project_views(ProjectId("project")))
 
     def test_malformed_yaml_does_not_get_overwritten(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -47,7 +47,7 @@ class FilesystemRegionsTests(unittest.TestCase):
             metadata = project / "project.yaml"
             metadata.write_text("version: 9\n")
             with self.assertRaises(ValueError):
-                FilesystemProjectStore(root).read_project_regions(ProjectId("project"))
+                FilesystemProjectStore(root).read_project_views(ProjectId("project"))
             self.assertEqual("version: 9\n", metadata.read_text())
 
     def test_v2_yaml_raises_value_error(self) -> None:
@@ -56,7 +56,7 @@ class FilesystemRegionsTests(unittest.TestCase):
             project.mkdir()
             (project / "project.yaml").write_text("version: 2\nnext_region_id: 2\nregions:\n- id: 1\n  name: Region 1\n  pipeline: {rotate: {degrees: 90}}\n  rectangle: {x: 0, y: 0, width: 1, height: 1}\n")
             with self.assertRaises(ValueError):
-                FilesystemProjectStore(Path(directory)).read_project_regions(ProjectId("project"))
+                FilesystemProjectStore(Path(directory)).read_project_views(ProjectId("project"))
 
     def test_v1_yaml_raises_value_error(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -64,7 +64,7 @@ class FilesystemRegionsTests(unittest.TestCase):
             project.mkdir()
             (project / "project.yaml").write_text("version: 1\nnext_region_id: 2\nregions:\n- id: 1\n  name: Region 1\n  rotation: 90\n  rectangle: {x: 0, y: 0, width: 1, height: 1}\n")
             with self.assertRaises(ValueError):
-                FilesystemProjectStore(Path(directory)).read_project_regions(ProjectId("project"))
+                FilesystemProjectStore(Path(directory)).read_project_views(ProjectId("project"))
 
     def test_pipeline_with_extra_keys_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -72,7 +72,35 @@ class FilesystemRegionsTests(unittest.TestCase):
             project.mkdir()
             (project / "project.yaml").write_text("version: 3\nnext_region_id: 2\nregions:\n- id: 1\n  name: Region 1\n  pipeline:\n    - kind: rotate\n      options: {degrees: 90}\n      unknown: {}\n  rectangle: {x: 0, y: 0, width: 1, height: 1}\n")
             with self.assertRaises(ValueError):
-                FilesystemProjectStore(Path(directory)).read_project_regions(ProjectId("project"))
+                FilesystemProjectStore(Path(directory)).read_project_views(ProjectId("project"))
+
+    def test_v3_yaml_migrates_rectangle_before_pipeline(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = self._project(root)
+            (project / "project.yaml").write_text(
+                "version: 3\n"
+                "next_region_id: 2\n"
+                "regions:\n"
+                "- id: 1\n"
+                "  name: Region 1\n"
+                "  rectangle: {x: 0.1, y: 0.2, width: 0.7, height: 0.6}\n"
+                "  pipeline:\n"
+                "    - kind: rotate\n"
+                "      options: {degrees: 90}\n"
+            )
+
+            views = FilesystemProjectStore(root).read_project_views(ProjectId("project"))
+
+            self.assertEqual(
+                Pipeline(
+                    (
+                        Operation("crop", {"x": 0.1, "y": 0.2, "width": 0.7, "height": 0.6}),
+                        Operation("rotate", {"degrees": 90}),
+                    )
+                ),
+                views.views[0].pipeline,
+            )
 
 
 class FilesystemProjectWriterTests(unittest.TestCase):
@@ -101,9 +129,9 @@ class FilesystemProjectWriterTests(unittest.TestCase):
             root = Path(directory)
             store = FilesystemProjectStore(root)
             store.create_project(ProjectId("p"), ProjectImage(PNG_HEADER))
-            store.write_project_regions(ProjectId("p"), ProjectRegions(2, (CropRegion(1, "R", CropRectangle(0, 0, 1, 1)),)))
+            store.write_project_views(ProjectId("p"), ProjectViews(2, (View(1, "R", Pipeline()),)))
             store.replace_project_image(ProjectId("p"), ProjectImage(PNG_HEADER + b"more"))
-            self.assertEqual(ProjectRegions(1), store.read_project_regions(ProjectId("p")))
+            self.assertEqual(ProjectViews(1), store.read_project_views(ProjectId("p")))
             self.assertEqual(PNG_HEADER + b"more", (root / "p" / "image.png").read_bytes())
 
 

@@ -3,7 +3,7 @@ import unittest
 
 from PIL import Image, ImageDraw
 
-from infrastructure.image_processor.opencv_region_analyzer import OpenCVDocumentAnalyzer
+from infrastructure.image_processor.opencv_view_analyzer import OpenCVDocumentAnalyzer
 
 
 def png(background: str = "white", document: bool = True) -> bytes:

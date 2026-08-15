@@ -6,8 +6,21 @@ from PIL import Image
 
 try:
     from model.rendered_region import RenderedRegion
+    from model.operation_spec import OperationSpec
 except ImportError:
     from ....model.rendered_region import RenderedRegion
+    from ....model.operation_spec import OperationSpec
+
+
+def _straighten(options: dict) -> dict:
+    angle = options.get("angle")
+    if isinstance(angle, bool) or not isinstance(angle, Real) or not math.isfinite(angle) or abs(angle) > 45:
+        raise ValueError("Invalid straighten angle")
+    canonical = round(angle * 10) / 10
+    return {"angle": 0.0 if canonical == 0 else canonical}
+
+
+STRAIGHTEN_SPEC = OperationSpec("straighten", {"angle": "real, between -45 and 45"}, _straighten)
 
 
 class StraightenExecutor:
@@ -18,20 +31,10 @@ class StraightenExecutor:
     """
 
     kind = "straighten"
+    spec = STRAIGHTEN_SPEC
 
     def validate(self, options: dict) -> dict:
-        angle = options.get("angle")
-        if (
-            isinstance(angle, bool)
-            or not isinstance(angle, Real)
-            or not math.isfinite(angle)
-            or abs(angle) > 45
-        ):
-            raise ValueError("Invalid straighten angle")
-        canonical = round(angle * 10) / 10
-        if canonical == 0:
-            canonical = 0.0
-        return {"angle": canonical}
+        return STRAIGHTEN_SPEC.validate_options(options)
 
     def render(self, region: RenderedRegion, options: dict) -> RenderedRegion:
         angle = options["angle"]

@@ -7,7 +7,7 @@ except ImportError:
 
 
 class DeleteProject:
-    """Delete an existing project, including its regions and source image."""
+    """Delete an existing project, including its views and source image."""
 
     def __init__(self, store: ProjectStore, writer: ProjectWriter) -> None:
         self._store = store

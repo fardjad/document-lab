@@ -9,7 +9,7 @@ test.beforeEach(async () => {
   await cp(fixtureRoot, projectsRoot, { recursive: true });
 });
 
-test("loads projects and displays selected region", async ({ page }) => {
+test("loads projects and displays selected view", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });

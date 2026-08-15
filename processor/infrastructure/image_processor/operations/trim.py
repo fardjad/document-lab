@@ -4,8 +4,21 @@ from PIL import Image
 
 try:
     from model.rendered_region import RenderedRegion
+    from model.operation_spec import OperationSpec
 except ImportError:
     from ....model.rendered_region import RenderedRegion
+    from ....model.operation_spec import OperationSpec
+
+
+def _trim(options: dict) -> dict:
+    for edge in ("top", "right", "bottom", "left"):
+        value = options.get(edge)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError("Invalid trim edge")
+    return {edge: options[edge] for edge in ("top", "right", "bottom", "left")}
+
+
+TRIM_SPEC = OperationSpec("trim", {edge: "non-negative int" for edge in ("top", "right", "bottom", "left")}, _trim)
 
 
 class TrimExecutor:
@@ -16,13 +29,10 @@ class TrimExecutor:
     """
 
     kind = "trim"
+    spec = TRIM_SPEC
 
     def validate(self, options: dict) -> dict:
-        for edge in ("top", "right", "bottom", "left"):
-            value = options.get(edge)
-            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-                raise ValueError("Invalid trim edge")
-        return {"top": options["top"], "right": options["right"], "bottom": options["bottom"], "left": options["left"]}
+        return TRIM_SPEC.validate_options(options)
 
     def render(self, region: RenderedRegion, options: dict) -> RenderedRegion:
         top = options["top"]

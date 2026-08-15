@@ -4,54 +4,41 @@ from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 
 try:
-    from application.auto_processing.usecases.auto_straighten_region import AutoStraightenRegion
-    from application.auto_processing.usecases.auto_trim_region import AutoTrimRegion
+    from application.auto_processing.usecases.auto_straighten_view import AutoStraightenView
+    from application.auto_processing.usecases.auto_trim_view import AutoTrimView
     from application.project.usecases.create_project import CreateProject
     from application.project.usecases.delete_project import DeleteProject
     from application.project.usecases.import_project import ImportProject
     from application.project.usecases.list_projects import ListProjects
     from application.project.usecases.read_project_image import ReadProjectImage
     from application.project.usecases.update_project import UpdateProject
-    from application.region.usecases.delete_region import DeleteRegion
-    from application.region.usecases.list_regions import ListRegions
-    from application.region.usecases.create_region import CreateRegion
-    from application.region.usecases.update_region import UpdateRegion
-    from application.region.usecases.render_region import RegionRenderError, RenderRegion
+    from application.view.usecases.delete_view import DeleteView
+    from application.view.usecases.list_views import ListViews
+    from application.view.usecases.create_view import CreateView
+    from application.view.usecases.update_view import UpdateView
+    from application.view.usecases.render_view import ViewRenderError, RenderView
     from model.operation import Operation
     from model.pipeline import Pipeline
     from model.project import ProjectImage, ProjectNotFound
-    from model.region import CropRectangle, RegionNotFound
+    from model.view import ViewNotFound
 except ImportError:
-    from ..application.auto_processing.usecases.auto_straighten_region import AutoStraightenRegion
-    from ..application.auto_processing.usecases.auto_trim_region import AutoTrimRegion
+    from ..application.auto_processing.usecases.auto_straighten_view import AutoStraightenView
+    from ..application.auto_processing.usecases.auto_trim_view import AutoTrimView
     from ..application.project.usecases.create_project import CreateProject
     from ..application.project.usecases.delete_project import DeleteProject
     from ..application.project.usecases.import_project import ImportProject
     from ..application.project.usecases.list_projects import ListProjects
     from ..application.project.usecases.read_project_image import ReadProjectImage
     from ..application.project.usecases.update_project import UpdateProject
-    from ..application.region.usecases.delete_region import DeleteRegion
-    from ..application.region.usecases.list_regions import ListRegions
-    from ..application.region.usecases.create_region import CreateRegion
-    from ..application.region.usecases.update_region import UpdateRegion
-    from ..application.region.usecases.render_region import RegionRenderError, RenderRegion
+    from ..application.view.usecases.delete_view import DeleteView
+    from ..application.view.usecases.list_views import ListViews
+    from ..application.view.usecases.create_view import CreateView
+    from ..application.view.usecases.update_view import UpdateView
+    from ..application.view.usecases.render_view import ViewRenderError, RenderView
     from ..model.operation import Operation
     from ..model.pipeline import Pipeline
     from ..model.project import ProjectImage, ProjectNotFound
-    from ..model.region import CropRectangle, RegionNotFound
-
-
-class RectangleRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    x: float
-    y: float
-    width: float
-    height: float
-
-
-class CreateRegionRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    rectangle: RectangleRequest
+    from ..model.view import ViewNotFound
 
 
 class OperationRequest(BaseModel):
@@ -65,27 +52,27 @@ class PipelineRequest(BaseModel):
     operations: list[OperationRequest]
 
 
-class UpdateRegionRequest(BaseModel):
+class CreateViewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
-    rectangle: RectangleRequest
+    pipeline: PipelineRequest | None = None
+
+
+class UpdateViewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
     pipeline: PipelineRequest
-
-
-def _rectangle(request: RectangleRequest) -> CropRectangle:
-    return CropRectangle(request.x, request.y, request.width, request.height)
 
 
 def _pipeline(request: PipelineRequest) -> Pipeline:
     return Pipeline(tuple(Operation(op.kind, dict(op.options)) for op in request.operations))
 
 
-def _region_response(item) -> dict:
+def _view_response(item) -> dict:
     return {
         "id": item.id,
         "name": item.name,
         "pipeline": [{"kind": op.kind, "options": dict(op.options)} for op in item.pipeline.operations],
-        "rectangle": {"x": item.rectangle.x, "y": item.rectangle.y, "width": item.rectangle.width, "height": item.rectangle.height},
     }
 
 
@@ -104,13 +91,13 @@ def create_app(
     update_project: UpdateProject,
     delete_project: DeleteProject,
     import_project: ImportProject,
-    list_regions: ListRegions,
-    create_region: CreateRegion,
-    update_region: UpdateRegion,
-    delete_region: DeleteRegion,
-    render_region: RenderRegion,
-    auto_straighten: AutoStraightenRegion,
-    auto_trim: AutoTrimRegion,
+    list_views: ListViews,
+    create_view: CreateView,
+    update_view: UpdateView,
+    delete_view: DeleteView,
+    render_view: RenderView,
+    auto_straighten: AutoStraightenView,
+    auto_trim: AutoTrimView,
 ) -> FastAPI:
     application = FastAPI(title="Document Cropper Processor")
     application.add_middleware(
@@ -164,83 +151,83 @@ def create_app(
             raise HTTPException(status_code=404, detail=str(error)) from error
         return Response(content=image.data, media_type="image/png")
 
-    @application.get("/api/projects/{project_id}/regions")
-    def regions(project_id: str) -> list[dict]:
+    @application.get("/api/projects/{project_id}/views")
+    def views(project_id: str) -> list[dict]:
         try:
-            return [_region_response(item) for item in list_regions.list(project_id).regions]
+            return [_view_response(item) for item in list_views.list(project_id).views]
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
 
-    @application.post("/api/projects/{project_id}/regions", status_code=201)
-    def create_region_endpoint(project_id: str, request: CreateRegionRequest) -> dict:
+    @application.post("/api/projects/{project_id}/views", status_code=201)
+    def create_view_endpoint(project_id: str, request: CreateViewRequest) -> dict:
         try:
-            item = create_region.create(project_id, _rectangle(request.rectangle))
+            item = create_view.create(project_id, request.name, _pipeline(request.pipeline) if request.pipeline else None)
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
-        return _region_response(item)
+        return _view_response(item)
 
-    @application.put("/api/projects/{project_id}/regions/{region_id}")
-    def update_region_endpoint(project_id: str, region_id: int, request: UpdateRegionRequest) -> dict:
+    @application.put("/api/projects/{project_id}/views/{view_id}")
+    def update_view_endpoint(project_id: str, view_id: int, request: UpdateViewRequest) -> dict:
         try:
-            item = update_region.update(project_id, region_id, request.name, _rectangle(request.rectangle), _pipeline(request.pipeline))
+            item = update_view.update(project_id, view_id, request.name, _pipeline(request.pipeline))
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        except RegionNotFound as error:
+        except ViewNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
-        return _region_response(item)
+        return _view_response(item)
 
-    @application.delete("/api/projects/{project_id}/regions/{region_id}", status_code=204)
-    def delete_region_endpoint(project_id: str, region_id: int) -> Response:
+    @application.delete("/api/projects/{project_id}/views/{view_id}", status_code=204)
+    def delete_view_endpoint(project_id: str, view_id: int) -> Response:
         try:
-            delete_region.delete(project_id, region_id)
+            delete_view.delete(project_id, view_id)
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        except RegionNotFound as error:
+        except ViewNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         return Response(status_code=204)
 
-    @application.get("/api/projects/{project_id}/regions/{region_id}/render")
-    def render(project_id: str, region_id: int) -> Response:
+    @application.get("/api/projects/{project_id}/views/{view_id}/render")
+    def render(project_id: str, view_id: int) -> Response:
         try:
-            content = render_region.render(project_id, region_id)
+            content = render_view.render(project_id, view_id)
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        except RegionNotFound as error:
+        except ViewNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        except RegionRenderError as error:
+        except ViewRenderError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
-        return Response(content=content, media_type="image/png", headers={"Content-Disposition": f'attachment; filename="{project_id}-region-{region_id}.png"'})
+        return Response(content=content, media_type="image/png", headers={"Content-Disposition": f'attachment; filename="{project_id}-view-{view_id}.png"'})
 
-    @application.post("/api/projects/{project_id}/regions/{region_id}/render")
-    def preview_region(project_id: str, region_id: int, request: PipelineRequest) -> Response:
+    @application.post("/api/projects/{project_id}/views/{view_id}/render")
+    def preview_view(project_id: str, view_id: int, request: PipelineRequest) -> Response:
         try:
-            content = render_region.preview(project_id, region_id, _pipeline(request))
+            content = render_view.preview(project_id, view_id, _pipeline(request))
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        except RegionNotFound as error:
+        except ViewNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        except RegionRenderError as error:
+        except ViewRenderError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         return Response(content=content, media_type="image/png")
 
-    @application.post("/api/projects/{project_id}/regions/{region_id}/auto/straighten")
-    def auto_straighten_region(project_id: str, region_id: int) -> dict:
+    @application.post("/api/projects/{project_id}/views/{view_id}/auto/straighten")
+    def auto_straighten_view(project_id: str, view_id: int) -> dict:
         try:
-            return _analysis_response(auto_straighten.suggest(project_id, region_id))
-        except (ProjectNotFound, RegionNotFound) as error:
+            return _analysis_response(auto_straighten.suggest(project_id, view_id))
+        except (ProjectNotFound, ViewNotFound) as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
-    @application.post("/api/projects/{project_id}/regions/{region_id}/auto/trim")
-    def auto_trim_region(project_id: str, region_id: int) -> dict:
+    @application.post("/api/projects/{project_id}/views/{view_id}/auto/trim")
+    def auto_trim_view(project_id: str, view_id: int) -> dict:
         try:
-            return _analysis_response(auto_trim.suggest(project_id, region_id))
-        except (ProjectNotFound, RegionNotFound) as error:
+            return _analysis_response(auto_trim.suggest(project_id, view_id))
+        except (ProjectNotFound, ViewNotFound) as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error

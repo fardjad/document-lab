@@ -1,14 +1,12 @@
-version: 3
-next_region_id: 2
-regions:
+version: 4
+next_view_id: 2
+views:
   - id: 1
     name: Receipt
-    rectangle:
-      x: 0.1
-      y: 0.1
-      width: 0.35
-      height: 0.325
     pipeline:
+      - kind: crop
+        options: {x: 0.1, y: 0.1, width: 0.35, height: 0.325}
+      - kind:
       - kind: rotate
         options: {degrees: 0}
       - kind: straighten

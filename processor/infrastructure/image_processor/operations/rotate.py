@@ -4,8 +4,20 @@ from PIL import Image
 
 try:
     from model.rendered_region import RenderedRegion
+    from model.operation_spec import OperationSpec
 except ImportError:
     from ....model.rendered_region import RenderedRegion
+    from ....model.operation_spec import OperationSpec
+
+
+def _rotate(options: dict) -> dict:
+    degrees = options.get("degrees")
+    if isinstance(degrees, bool) or not isinstance(degrees, int) or degrees % 90 != 0:
+        raise ValueError("Invalid rotate degrees")
+    return {"degrees": degrees % 360}
+
+
+ROTATE_SPEC = OperationSpec("rotate", {"degrees": "int, multiple of 90"}, _rotate)
 
 
 class RotateExecutor:
@@ -16,12 +28,10 @@ class RotateExecutor:
     """
 
     kind = "rotate"
+    spec = ROTATE_SPEC
 
     def validate(self, options: dict) -> dict:
-        degrees = options.get("degrees")
-        if isinstance(degrees, bool) or not isinstance(degrees, int) or degrees % 90 != 0:
-            raise ValueError("Invalid rotate degrees")
-        return {"degrees": degrees % 360}
+        return ROTATE_SPEC.validate_options(options)
 
     def render(self, region: RenderedRegion, options: dict) -> RenderedRegion:
         degrees = options["degrees"]

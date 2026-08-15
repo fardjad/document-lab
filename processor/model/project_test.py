@@ -1,6 +1,7 @@
 import unittest
 
-from model.project import ProjectId, ProjectImage
+from model.project import Project, ProjectId, ProjectImage
+from model.view import ProjectViews, View
 
 
 class ProjectIdTests(unittest.TestCase):
@@ -23,6 +24,26 @@ class ProjectImageTests(unittest.TestCase):
         for data in (b"\xff\xd8\xff\xe0jpeg", b"", "not bytes"):
             with self.subTest(data=data), self.assertRaisesRegex(ValueError, "Only PNG"):
                 ProjectImage.from_png(data)  # type: ignore[arg-type]
+
+
+class ProjectViewsDelegationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.project = Project(ProjectId("project"), ProjectImage(b"image"), ProjectViews(2, (View(1, "first"),)))
+
+    def test_find_view_delegates(self) -> None:
+        self.assertEqual(View(1, "first"), self.project.find_view(1))
+
+    def test_add_view_delegates(self) -> None:
+        updated = self.project.add_view(View(2, "second"))
+        self.assertEqual((View(1, "first"), View(2, "second")), updated.views.views)
+
+    def test_replace_view_delegates(self) -> None:
+        updated = self.project.replace_view(View(1, "renamed"))
+        self.assertEqual("renamed", updated.find_view(1).name)
+
+    def test_remove_view_delegates(self) -> None:
+        updated = self.project.remove_view(1)
+        self.assertEqual((), updated.views.views)
 
 
 if __name__ == "__main__":

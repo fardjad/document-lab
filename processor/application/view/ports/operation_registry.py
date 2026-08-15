@@ -2,8 +2,10 @@ from typing import Protocol
 
 try:
     from model.rendered_region import RenderedRegion
+    from model.operation_spec import OperationSpec
 except ImportError:
     from ....model.rendered_region import RenderedRegion
+    from ....model.operation_spec import OperationSpec
 
 
 class OperationExecutor(Protocol):
@@ -18,12 +20,20 @@ class OperationExecutor(Protocol):
 
     def validate(self, options: dict) -> dict: ...
 
-    def render(self, region: RenderedRegion, options: dict) -> RenderedRegion: ...
+    def render(self, view: RenderedRegion, options: dict) -> RenderedRegion: ...
 
 
 class OperationRegistry(Protocol):
     """Outbound contract for resolving operation executors by kind."""
 
     def get(self, kind: str) -> OperationExecutor: ...
+
+    def kinds(self) -> tuple[str, ...]: ...
+
+
+class OperationSpecRegistry(Protocol):
+    """Outbound contract for resolving pure operation option specifications."""
+
+    def spec_for(self, kind: str) -> OperationSpec: ...
 
     def kinds(self) -> tuple[str, ...]: ...

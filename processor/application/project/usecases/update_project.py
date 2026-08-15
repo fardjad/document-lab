@@ -10,7 +10,7 @@ class UpdateProject:
     """Replace a project's source image.
 
     Region geometry is normalized to the source image, so replacing the image
-    invalidates region pipelines; regions are reset to the empty collection.
+    invalidates view pipelines; views are reset to the empty collection.
     """
 
     def __init__(self, store: ProjectStore, writer: ProjectWriter) -> None:
