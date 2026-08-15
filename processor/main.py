@@ -1,6 +1,5 @@
 try:
-    from .application.auto_processing.usecases.auto_straighten_view import AutoStraightenView
-    from .application.auto_processing.usecases.auto_trim_view import AutoTrimView
+    from .application.auto_processing.usecases.invoke_helper import InvokeHelper
     from .application.project.usecases.create_project import CreateProject
     from .application.project.usecases.delete_project import DeleteProject
     from .application.project.usecases.import_project import ImportProject
@@ -25,8 +24,7 @@ try:
     from .infrastructure.image_processor.operations.crop import CropOperation
     from .infrastructure.image_processor.rembg_background_remover import RembgBackgroundRemover
 except ImportError:
-    from application.auto_processing.usecases.auto_straighten_view import AutoStraightenView
-    from application.auto_processing.usecases.auto_trim_view import AutoTrimView
+    from application.auto_processing.usecases.invoke_helper import InvokeHelper
     from application.project.usecases.create_project import CreateProject
     from application.project.usecases.delete_project import DeleteProject
     from application.project.usecases.import_project import ImportProject
@@ -81,6 +79,5 @@ app = create_app(
     UpdateView(store, registry),
     DeleteView(store),
     RenderView(store, read_project_image, read_project_image_size, registry),
-    AutoStraightenView(store, read_project_image, read_project_image_size, registry),
-    AutoTrimView(store, read_project_image, read_project_image_size, registry),
+    InvokeHelper(store, read_project_image, read_project_image_size, registry),
 )

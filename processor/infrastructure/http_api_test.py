@@ -7,8 +7,7 @@ from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
 
 from infrastructure.http_api import create_app
-from application.auto_processing.usecases.auto_straighten_view import AutoStraightenView
-from application.auto_processing.usecases.auto_trim_view import AutoTrimView
+from application.auto_processing.usecases.invoke_helper import InvokeHelper
 from application.project.usecases.create_project import CreateProject
 from application.project.usecases.delete_project import DeleteProject
 from application.project.usecases.import_project import ImportProject
@@ -57,7 +56,7 @@ class HttpApiIntegrationTests(unittest.TestCase):
         sizes = ReadProjectImageSize(store)
         analyzer = OpenCVDocumentAnalyzer()
         registry = OperationRegistryImpl([RotateOperation(), StraightenOperation(analyzer), TrimOperation(analyzer), CropOperation(), RemoveBackgroundOperation(PassthroughRemover())])
-        self.client = TestClient(create_app(ListProjects(store), reader, ["http://test"], CreateProject(store, store), UpdateProject(store, store), DeleteProject(store, store), ImportProject(store, store), ListViews(store), CreateView(store), UpdateView(store, registry), DeleteView(store), RenderView(store, reader, sizes, registry), AutoStraightenView(store, reader, sizes, registry), AutoTrimView(store, reader, sizes, registry)))
+        self.client = TestClient(create_app(ListProjects(store), reader, ["http://test"], CreateProject(store, store), UpdateProject(store, store), DeleteProject(store, store), ImportProject(store, store), ListViews(store), CreateView(store), UpdateView(store, registry), DeleteView(store), RenderView(store, reader, sizes, registry), InvokeHelper(store, reader, sizes, registry)))
 
     def test_project_lifecycle_end_to_end(self) -> None:
         created = self.client.post("/api/projects", params={"project_id": "scan"}, files={"image": ("image.png", png(), "image/png")})

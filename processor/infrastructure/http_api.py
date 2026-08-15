@@ -4,8 +4,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 
 try:
-    from application.auto_processing.usecases.auto_straighten_view import AutoStraightenView
-    from application.auto_processing.usecases.auto_trim_view import AutoTrimView
+    from application.auto_processing.usecases.invoke_helper import InvokeHelper
     from application.project.usecases.create_project import CreateProject
     from application.project.usecases.delete_project import DeleteProject
     from application.project.usecases.import_project import ImportProject
@@ -23,8 +22,7 @@ try:
     from model.project import ProjectImage, ProjectNotFound
     from model.view import ViewNotFound
 except ImportError:
-    from ..application.auto_processing.usecases.auto_straighten_view import AutoStraightenView
-    from ..application.auto_processing.usecases.auto_trim_view import AutoTrimView
+    from ..application.auto_processing.usecases.invoke_helper import InvokeHelper
     from ..application.project.usecases.create_project import CreateProject
     from ..application.project.usecases.delete_project import DeleteProject
     from ..application.project.usecases.import_project import ImportProject
@@ -108,8 +106,7 @@ def create_app(
     update_view: UpdateView,
     delete_view: DeleteView,
     render_view: RenderView,
-    auto_straighten: AutoStraightenView,
-    auto_trim: AutoTrimView,
+    invoke_helper: InvokeHelper,
 ) -> FastAPI:
     application = FastAPI(title="Document Cropper Processor")
     application.add_middleware(
@@ -229,7 +226,7 @@ def create_app(
     @application.post("/api/projects/{project_id}/views/{view_id}/auto/straighten")
     def auto_straighten_view(project_id: str, view_id: int) -> dict:
         try:
-            options = auto_straighten.invoke(project_id, view_id, _operation_index(auto_straighten, project_id, view_id, "straighten"), "auto_straighten", {})
+            options = invoke_helper.invoke(project_id, view_id, _operation_index(invoke_helper, project_id, view_id, "straighten"), "auto_straighten", {})
             return {"suggestion": options.get("angle"), "confidence": None, "reason": None}
         except (ProjectNotFound, ViewNotFound) as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
@@ -239,7 +236,7 @@ def create_app(
     @application.post("/api/projects/{project_id}/views/{view_id}/auto/trim")
     def auto_trim_view(project_id: str, view_id: int) -> dict:
         try:
-            options = auto_trim.invoke(project_id, view_id, _operation_index(auto_trim, project_id, view_id, "trim"), "auto_trim", {})
+            options = invoke_helper.invoke(project_id, view_id, _operation_index(invoke_helper, project_id, view_id, "trim"), "auto_trim", {})
             return {"suggestion": {"kind": "trim", "options": options}, "confidence": None, "reason": None}
         except (ProjectNotFound, ViewNotFound) as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
