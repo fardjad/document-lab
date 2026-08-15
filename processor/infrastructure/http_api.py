@@ -84,14 +84,15 @@ def _analysis_response(result) -> dict:
     return {"suggestion": suggestion, "confidence": result.confidence, "reason": result.reason}
 
 
-def _operation_index(usecase, project_id: str, view_id: int, kind: str) -> int:
+def _operation_index(usecase, project_id: str, view_id: int, helper_name: str) -> int:
     view = usecase.views.read_project_views(project_id_or_not_found(project_id)).find_view(view_id)
     if view is None:
         raise ViewNotFound("View not found")
     for index, operation in enumerate(view.pipeline.operations):
-        if operation.kind == kind and operation.enabled:
+        registered = usecase.registry.get(operation.kind)
+        if any(helper.name == helper_name for helper in registered.helpers):
             return index
-    return len(view.pipeline.operations)
+    raise ValueError(f"Unknown helper: {helper_name}")
 
 
 def create_app(
@@ -251,21 +252,17 @@ def create_app(
             raise HTTPException(status_code=422, detail=str(error)) from error
         return Response(content=content, media_type="image/png")
 
-    @application.post("/api/projects/{project_id}/views/{view_id}/auto/straighten")
-    def auto_straighten_view(project_id: str, view_id: int) -> dict:
+    @application.post("/api/projects/{project_id}/views/{view_id}/helpers/{helper_name}")
+    def invoke_helper_endpoint(project_id: str, view_id: int, helper_name: str, invocation_options: dict | None = None) -> dict:
         try:
-            options = invoke_helper.invoke(project_id, view_id, _operation_index(invoke_helper, project_id, view_id, "straighten"), "auto_straighten", {})
-            return {"suggestion": options.get("angle"), "confidence": None, "reason": None}
-        except (ProjectNotFound, ViewNotFound) as error:
-            raise HTTPException(status_code=404, detail=str(error)) from error
-        except ValueError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
-
-    @application.post("/api/projects/{project_id}/views/{view_id}/auto/trim")
-    def auto_trim_view(project_id: str, view_id: int) -> dict:
-        try:
-            options = invoke_helper.invoke(project_id, view_id, _operation_index(invoke_helper, project_id, view_id, "trim"), "auto_trim", {})
-            return {"suggestion": {"kind": "trim", "options": options}, "confidence": None, "reason": None}
+            options = invoke_helper.invoke(
+                project_id,
+                view_id,
+                _operation_index(invoke_helper, project_id, view_id, helper_name),
+                helper_name,
+                invocation_options or {},
+            )
+            return {"options": options}
         except (ProjectNotFound, ViewNotFound) as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:
