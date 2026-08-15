@@ -16,14 +16,22 @@ class Helper:
     name: str
     invocation_spec: OperationSpec
     invoke: Callable[[RenderedRegion, dict, dict], dict]
+    display_name: str | None = None
+    description: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not self.name:
             raise ValueError("Invalid helper name")
+        display_name = self.name.replace("_", " ").title() if self.display_name is None else self.display_name
+        if not isinstance(display_name, str) or not display_name:
+            raise ValueError("Invalid helper display name")
+        if not isinstance(self.description, str):
+            raise ValueError("Invalid helper description")
         if not isinstance(self.invocation_spec, OperationSpec):
             raise ValueError("Invalid helper invocation spec")
         if not callable(self.invoke):
             raise ValueError("Invalid helper invoker")
+        object.__setattr__(self, "display_name", display_name)
 
     def invoke_helper(
         self,

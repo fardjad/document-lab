@@ -22,7 +22,11 @@ def validate_crop(options: dict) -> dict:
     return {key: value for key, value in zip(("x", "y", "width", "height"), values)}
 
 
-CROP_SPEC = OperationSpec("crop", {key: "finite real, normalized" for key in ("x", "y", "width", "height")}, validate_crop)
+CROP_DEFAULTS = {"x": 0, "y": 0, "width": 1, "height": 1}
+CROP_SPEC = OperationSpec("crop", {
+    key: {"type": "float", "label": label, "description": description, "control": "number", "min": 0, "max": 1, "step": 0.01, "default": CROP_DEFAULTS[key], "required": True}
+    for key, label, description in (("x", "X", "Left edge position (normalized 0-1)"), ("y", "Y", "Top edge position (normalized 0-1)"), ("width", "Width", "Crop width (normalized 0-1)"), ("height", "Height", "Crop height (normalized 0-1)"))
+}, validate_crop, "Crop", "Select a rectangular region of the image", "Crop169", CROP_DEFAULTS)
 
 
 class CropOperation:

@@ -17,7 +17,7 @@ def _rotate(options: dict) -> dict:
     return {"degrees": degrees % 360}
 
 
-ROTATE_SPEC = OperationSpec("rotate", {"degrees": "int, multiple of 90"}, _rotate)
+ROTATE_SPEC = OperationSpec("rotate", {"degrees": {"type": "int", "label": "Degrees", "description": "Rotation angle in 90-degree increments", "control": "slider", "min": 0, "max": 270, "step": 90, "default": 0, "required": True}}, _rotate, "Rotate", "Rotate the image in 90-degree increments", "Rotate90DegreesCcw", {"degrees": 0})
 
 
 class RotateOperation:

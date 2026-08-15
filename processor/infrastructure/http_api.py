@@ -107,6 +107,7 @@ def create_app(
     delete_view: DeleteView,
     render_view: RenderView,
     invoke_helper: InvokeHelper,
+    registry=None,
 ) -> FastAPI:
     application = FastAPI(title="Document Cropper Processor")
     application.add_middleware(
@@ -115,6 +116,32 @@ def create_app(
         allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["*"],
     )
+
+    @application.get("/api/operations")
+    def operations() -> list[dict]:
+        if registry is None:
+            return []
+        result = []
+        for kind in registry.kinds():
+            spec = registry.get(kind).spec
+            result.append({
+                "kind": spec.kind,
+                "name": spec.display_name,
+                "description": spec.description,
+                "icon": spec.icon,
+                "default_options": dict(spec.default_options),
+                "schema": spec.schema,
+                "helpers": [
+                    {
+                        "name": helper.name,
+                        "display_name": helper.display_name,
+                        "description": helper.description,
+                        "schema": helper.invocation_spec.schema,
+                    }
+                    for helper in registry.get(kind).helpers
+                ],
+            })
+        return result
 
     @application.get("/api/projects", response_model=list[str])
     def projects() -> list[str]:

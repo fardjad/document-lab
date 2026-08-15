@@ -22,9 +22,9 @@ def _straighten(options: dict) -> dict:
     return {"angle": 0.0 if canonical == 0 else canonical}
 
 
-STRAIGHTEN_SPEC = OperationSpec("straighten", {"angle": "real, between -45 and 45"}, _straighten)
+STRAIGHTEN_SPEC = OperationSpec("straighten", {"angle": {"type": "float", "label": "Angle", "description": "Deskew angle in degrees", "control": "slider", "min": -45, "max": 45, "step": 0.1, "default": 0.0, "required": True}}, _straighten, "Straighten", "Correct the image's skew angle", "Straighten", {"angle": 0.0})
 
-AUTO_STRAIGHTEN_INVOCATION_SPEC = OperationSpec("auto_straighten", {}, lambda options: {})
+AUTO_STRAIGHTEN_INVOCATION_SPEC = OperationSpec("auto_straighten", {}, lambda options: {}, "Auto-detect angle", "Automatically detect and correct skew angle", "AutoFixHigh", {})
 
 
 class StraightenOperation:
@@ -39,7 +39,7 @@ class StraightenOperation:
 
     def __init__(self, analyzer=None) -> None:
         self._analyzer = analyzer
-        self.helpers = (Helper("auto_straighten", AUTO_STRAIGHTEN_INVOCATION_SPEC, self._auto_straighten),)
+        self.helpers = (Helper("auto_straighten", AUTO_STRAIGHTEN_INVOCATION_SPEC, self._auto_straighten, "Auto-detect angle", "Automatically detect and correct skew angle"),)
 
     def _auto_straighten(self, rendered: RenderedRegion, invocation_options: dict, current_options: dict) -> dict:
         result = self._analyzer.detect_skew(rendered.image)

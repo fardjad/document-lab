@@ -20,8 +20,9 @@ def _trim(options: dict) -> dict:
     return {edge: options[edge] for edge in ("top", "right", "bottom", "left")}
 
 
-TRIM_SPEC = OperationSpec("trim", {edge: "non-negative int" for edge in ("top", "right", "bottom", "left")}, _trim)
-AUTO_TRIM_INVOCATION_SPEC = OperationSpec("auto_trim", {}, lambda options: {})
+TRIM_DEFAULTS = {edge: 0 for edge in ("top", "right", "bottom", "left")}
+TRIM_SPEC = OperationSpec("trim", {edge: {"type": "int", "label": edge.title(), "description": f"Pixels to trim from {edge}", "control": "number", "min": 0, "step": 1, "default": 0, "required": True} for edge in ("top", "right", "bottom", "left")}, _trim, "Trim", "Remove pixels from the image edges", "ContentCut", TRIM_DEFAULTS)
+AUTO_TRIM_INVOCATION_SPEC = OperationSpec("auto_trim", {}, lambda options: {}, "Auto-detect trim", "Automatically detect image borders", "AutoFixHigh", {})
 
 
 class TrimOperation:
@@ -36,7 +37,7 @@ class TrimOperation:
 
     def __init__(self, analyzer=None) -> None:
         self._analyzer = analyzer
-        self.helpers = (Helper("auto_trim", AUTO_TRIM_INVOCATION_SPEC, self._auto_trim),)
+        self.helpers = (Helper("auto_trim", AUTO_TRIM_INVOCATION_SPEC, self._auto_trim, "Auto-detect trim", "Automatically detect image borders"),)
 
     def _auto_trim(self, rendered: RenderedRegion, invocation_options: dict, current_options: dict) -> dict:
         result = self._analyzer.detect_trim(rendered.image)

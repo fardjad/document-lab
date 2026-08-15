@@ -80,4 +80,5 @@ app = create_app(
     DeleteView(store),
     RenderView(store, read_project_image, read_project_image_size, registry),
     InvokeHelper(store, read_project_image, read_project_image_size, registry),
+    registry,
 )

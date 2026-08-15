@@ -10,7 +10,7 @@ except ImportError:
     from ....application.view.ports.operation_spec import OperationSpec
 
 
-BACKGROUND_REMOVAL_MODELS = ("birefnet-general", "isnet-general-use", "u2net", "u2netp", "silueta")
+BACKGROUND_REMOVAL_MODELS = ("birefnet-general", "birefnet-portrait", "isnet-general", "isnet-anime", "u2net", "silueta")
 
 def _remove_background(options: dict) -> dict:
     model = options.get("model", "birefnet-general")
@@ -23,7 +23,15 @@ def _remove_background(options: dict) -> dict:
     if isinstance(erode, bool) or not isinstance(erode, int) or not 1 <= erode <= 100: raise ValueError("Invalid background removal erode size")
     return {"model": model, "alpha_matting": alpha_matting, "alpha_matting_foreground_threshold": foreground, "alpha_matting_background_threshold": background, "alpha_matting_erode_size": erode, "post_process_mask": post_process_mask}
 
-REMOVE_BACKGROUND_SPEC = OperationSpec("remove_background", {"model": BACKGROUND_REMOVAL_MODELS}, _remove_background)
+REMOVE_BACKGROUND_DEFAULTS = {"model": "birefnet-general", "alpha_matting": False, "alpha_matting_foreground_threshold": 128, "alpha_matting_background_threshold": 128, "alpha_matting_erode_size": 10, "post_process_mask": False}
+REMOVE_BACKGROUND_SPEC = OperationSpec("remove_background", {
+    "model": {"type": "select", "label": "Model", "description": "Background removal model", "control": "dropdown", "options": list(BACKGROUND_REMOVAL_MODELS), "default": "birefnet-general", "required": True},
+    "alpha_matting": {"type": "bool", "label": "Alpha matting", "description": "Enable alpha matting for finer edges", "control": "checkbox", "default": False, "required": True},
+    "alpha_matting_foreground_threshold": {"type": "int", "label": "Foreground threshold", "description": "Alpha matting foreground threshold", "control": "number", "min": 0, "max": 255, "step": 1, "default": 128, "required": True},
+    "alpha_matting_background_threshold": {"type": "int", "label": "Background threshold", "description": "Alpha matting background threshold", "control": "number", "min": 0, "max": 255, "step": 1, "default": 128, "required": True},
+    "alpha_matting_erode_size": {"type": "int", "label": "Erode size", "description": "Alpha matting erode size", "control": "number", "min": 1, "max": 100, "step": 1, "default": 10, "required": True},
+    "post_process_mask": {"type": "bool", "label": "Clean mask", "description": "Post-process the mask", "control": "checkbox", "default": False, "required": True},
+}, _remove_background, "Remove Background", "Remove the background from the image", "AutoFixHigh", REMOVE_BACKGROUND_DEFAULTS)
 
 
 class RemoveBackgroundOperation:
