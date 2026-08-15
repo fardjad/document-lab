@@ -4,7 +4,7 @@ try:
     from application.view.ports.operation_registry import OperationRegistry
     from application.view.ports.view_store import ProjectViewStore
     from application.view.usecases.project_lookup import project_id_or_not_found
-    from model.rendered_region import RenderedRegion
+    from application.view.ports.rendered_region import RenderedRegion
     from model.view import ViewNotFound
 except ImportError:
     from ..ports.document_analyzers import DocumentStraightener
@@ -12,7 +12,7 @@ except ImportError:
     from ...view.ports.operation_registry import OperationRegistry
     from ...view.ports.view_store import ProjectViewStore
     from ...view.usecases.project_lookup import project_id_or_not_found
-    from ....model.rendered_region import RenderedRegion
+    from ...view.ports.rendered_region import RenderedRegion
     from ....model.view import ViewNotFound
 
 

@@ -6,10 +6,10 @@ from PIL import Image
 
 try:
     from application.view.ports.operation_spec import OperationSpec
-    from model.rendered_region import RenderedRegion
+    from application.view.ports.rendered_region import RenderedRegion
 except ImportError:
     from ....application.view.ports.operation_spec import OperationSpec
-    from ....model.rendered_region import RenderedRegion
+    from ....application.view.ports.rendered_region import RenderedRegion
 
 
 def validate_crop(options: dict) -> dict:

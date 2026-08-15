@@ -4,7 +4,7 @@ import unittest
 from PIL import Image
 
 from infrastructure.image_processor.operations.trim import TrimExecutor
-from model.rendered_region import RenderedRegion
+from application.view.ports.rendered_region import RenderedRegion
 
 
 def region_bytes(width: int = 4, height: int = 4, color=(255, 0, 0, 255)) -> bytes:

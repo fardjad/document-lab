@@ -7,7 +7,7 @@ from model.pipeline import Pipeline
 from model.project import ProjectId, ProjectImage, ProjectNotFound
 from model.project import Project, ProjectImage
 from model.view import View, ViewNotFound
-from model.rendered_region import RenderedRegion
+from application.view.ports.rendered_region import RenderedRegion
 
 
 class FakeViewStore:

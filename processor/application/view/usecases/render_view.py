@@ -7,7 +7,7 @@ try:
     from model.pipeline import Pipeline
     from model.project import ProjectNotFound
     from model.view import ViewNotFound
-    from model.rendered_region import RenderedRegion
+    from application.view.ports.rendered_region import RenderedRegion
 except ImportError:
     from ..ports.operation_registry import OperationRegistry
     from ..ports.view_store import ProjectViewStore
@@ -15,7 +15,7 @@ except ImportError:
     from ....model.pipeline import Pipeline
     from ....model.project import ProjectNotFound
     from ....model.view import ViewNotFound
-    from ....model.rendered_region import RenderedRegion
+    from ..ports.rendered_region import RenderedRegion
 
 
 class ViewRenderError(ValueError):

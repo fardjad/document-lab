@@ -3,10 +3,10 @@ from io import BytesIO
 from PIL import Image
 
 try:
-    from model.rendered_region import RenderedRegion
+    from application.view.ports.rendered_region import RenderedRegion
     from application.view.ports.operation_spec import OperationSpec
 except ImportError:
-    from ....model.rendered_region import RenderedRegion
+    from ....application.view.ports.rendered_region import RenderedRegion
     from ....application.view.ports.operation_spec import OperationSpec
 
 

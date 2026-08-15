@@ -1,7 +1,6 @@
 import unittest
 
-from model.operation import Operation
-from model.rendered_region import RenderedRegion
+from application.view.ports.rendered_region import RenderedRegion
 
 
 class RenderedRegionTests(unittest.TestCase):
