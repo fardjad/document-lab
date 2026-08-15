@@ -29,6 +29,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import "./style.css";
 
 type Options = Record<string, unknown>;
@@ -90,7 +91,21 @@ function Preview({ project, view, pipeline, activeEditing }: { project?: Project
     e.preventDefault();
     setZoom(z => Math.max(.25, Math.min(8, z * (e.deltaY < 0 ? 1.1 : 0.9))));
   };
-  return <Box className="preview"><Box className="preview-toolbar"><Tooltip title="Fit and center"><IconButton onClick={() => reset()}><FitScreenIcon /></IconButton></Tooltip><Tooltip title="Actual size and center"><IconButton onClick={() => reset(1)}><CenterFocusStrongIcon /></IconButton></Tooltip><IconButton aria-label="Zoom out" onClick={() => setZoom(z => Math.max(.25, z / 1.25))}><ZoomOutIcon /></IconButton><Typography>{Math.round(zoom * 100)}%</Typography><IconButton aria-label="Zoom in" onClick={() => setZoom(z => Math.min(8, z * 1.25))}><ZoomInIcon /></IconButton></Box><Box className="image-viewer" ref={imageViewer}>{src ? <Box className="image-stage" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onWheel={wheel}><img key={`${project?.id ?? ""}-${view?.id ?? ""}`} ref={img} src={src} alt={project?.name ?? "Document"} draggable={false} /></Box> : <Typography color="text.secondary">Select a view to begin editing</Typography>}</Box></Box>;
+  const download = async () => {
+    if (!project || !view) return;
+    const response = await fetch(`${API}/projects/${encodeURIComponent(project.id)}/views/${view.id}/render`);
+    if (!response.ok) throw new Error(`Download failed (${response.status})`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${view.name}.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+  return <Box className="preview"><Box className="preview-toolbar"><Tooltip title="Fit and center"><IconButton onClick={() => reset()}><FitScreenIcon /></IconButton></Tooltip><Tooltip title="Actual size and center"><IconButton onClick={() => reset(1)}><CenterFocusStrongIcon /></IconButton></Tooltip><IconButton aria-label="Zoom out" onClick={() => setZoom(z => Math.max(.25, z / 1.25))}><ZoomOutIcon /></IconButton><Typography>{Math.round(zoom * 100)}%</Typography><IconButton aria-label="Zoom in" onClick={() => setZoom(z => Math.min(8, z * 1.25))}><ZoomInIcon /></IconButton><Tooltip title="Download rendered PNG"><IconButton aria-label="Download rendered PNG" disabled={!view} onClick={() => { void download(); }}><DownloadOutlinedIcon /></IconButton></Tooltip></Box><Box className="image-viewer" ref={imageViewer}>{src ? <Box className="image-stage" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onWheel={wheel}><img key={`${project?.id ?? ""}-${view?.id ?? ""}`} ref={img} src={src} alt={project?.name ?? "Document"} draggable={false} /></Box> : <Typography color="text.secondary">Select a view to begin editing</Typography>}</Box></Box>;
 }
 function Parameters({ meta, op, onChange }: { meta?: Metadata; op?: PipelineOp; onChange: (o: Options) => void }) {
   if (!meta || !op) return <Box className="parameters"><Typography variant="h6">Operation parameters</Typography><Typography color="text.secondary">Select an operation in the pipeline to edit its parameters.</Typography></Box>;
