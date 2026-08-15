@@ -5,10 +5,10 @@ from numbers import Real
 from PIL import Image
 
 try:
-    from model.operation_spec import OperationSpec
+    from application.view.ports.operation_spec import OperationSpec
     from model.rendered_region import RenderedRegion
 except ImportError:
-    from ....model.operation_spec import OperationSpec
+    from ....application.view.ports.operation_spec import OperationSpec
     from ....model.rendered_region import RenderedRegion
 
 

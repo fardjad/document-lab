@@ -2,12 +2,13 @@ import unittest
 
 from application.view.usecases.list_views import ListViews
 from model.project import ProjectId, ProjectNotFound
-from model.view import View, ProjectViews
+from model.project import Project, ProjectImage
+from model.view import View
 
 
 class FakeViewStore:
-    def read_project_views(self, project_id: ProjectId) -> ProjectViews:
-        return ProjectViews(2, (View(1, "Region 1"),))
+    def read_project_views(self, project_id: ProjectId) -> Project:
+        return Project(ProjectId("project"), ProjectImage(b""), 2, (View(1, "Region 1"),))
 
 
 class ListViewsTests(unittest.TestCase):

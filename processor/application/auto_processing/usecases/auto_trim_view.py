@@ -22,7 +22,7 @@ class AutoTrimView:
 
     def suggest(self, raw_project_id: str, view_id: int) -> AutoProcessingResult:
         project_id = project_id_or_not_found(raw_project_id)
-        selected = self._views.read_project_views(project_id).find(view_id)
+        selected = self._views.read_project_views(project_id).find_view(view_id)
         if selected is None:
             raise ViewNotFound("View not found")
         image = self._image_reader.read(raw_project_id)

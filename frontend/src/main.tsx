@@ -44,7 +44,7 @@ const getCrop = (pipeline: Pipeline): Rectangle | null => { const op = findOp(pi
 const getTrim = (pipeline: Pipeline): Trim => (findOp(pipeline, "trim")?.options as Trim) ?? { top: 0, right: 0, bottom: 0, left: 0 };
 const getRemoveBackground = (pipeline: Pipeline): BackgroundRemoval | null => { const op = findOp(pipeline, "remove_background"); return op ? (op.options as BackgroundRemoval) : null; };
 const asOperation = (kind: string, options: Record<string, unknown>): Operation => ({ kind, options });
-const setOp = (pipeline: Pipeline, kind: string, options: Record<string, unknown>): Pipeline => { const next = pipeline.filter((op) => op.kind !== kind); next.push(asOperation(kind, options)); return next; };
+const setOp = (pipeline: Pipeline, kind: string, options: Record<string, unknown>): Pipeline => { const next = pipeline.filter((op) => op.kind !== kind); const operation = asOperation(kind, options); if (kind === "crop") return [operation, ...next]; next.push(operation); return next; };
 const removeOps = (pipeline: Pipeline, ...kinds: string[]): Pipeline => pipeline.filter((op) => !kinds.includes(op.kind));
 type Project = { id: string; name: string; imageUrl: string; views: View[]; viewsLoading?: boolean; viewsError?: string };
 type EditorMode = { kind: "create" } | { kind: "edit"; view: View };

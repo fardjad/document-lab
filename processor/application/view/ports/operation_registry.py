@@ -2,10 +2,10 @@ from typing import Protocol
 
 try:
     from model.rendered_region import RenderedRegion
-    from model.operation_spec import OperationSpec
+    from application.view.ports.operation_spec import OperationSpec
 except ImportError:
     from ....model.rendered_region import RenderedRegion
-    from ....model.operation_spec import OperationSpec
+    from .operation_spec import OperationSpec
 
 
 class OperationExecutor(Protocol):

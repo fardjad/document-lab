@@ -4,10 +4,10 @@ from PIL import Image
 
 try:
     from model.rendered_region import RenderedRegion
-    from model.operation_spec import OperationSpec
+    from application.view.ports.operation_spec import OperationSpec
 except ImportError:
     from ....model.rendered_region import RenderedRegion
-    from ....model.operation_spec import OperationSpec
+    from ....application.view.ports.operation_spec import OperationSpec
 
 
 BACKGROUND_REMOVAL_MODELS = ("birefnet-general", "isnet-general-use", "u2net", "u2netp", "silueta")

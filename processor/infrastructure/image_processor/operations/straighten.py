@@ -6,10 +6,10 @@ from PIL import Image
 
 try:
     from model.rendered_region import RenderedRegion
-    from model.operation_spec import OperationSpec
+    from application.view.ports.operation_spec import OperationSpec
 except ImportError:
     from ....model.rendered_region import RenderedRegion
-    from ....model.operation_spec import OperationSpec
+    from ....application.view.ports.operation_spec import OperationSpec
 
 
 def _straighten(options: dict) -> dict:

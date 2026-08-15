@@ -2,17 +2,18 @@ import unittest
 
 from application.view.usecases.delete_view import DeleteView
 from model.project import ProjectId, ProjectNotFound
-from model.view import View, ProjectViews, ViewNotFound
+from model.project import Project, ProjectImage
+from model.view import View, ViewNotFound
 
 
 class FakeViewStore:
     def __init__(self) -> None:
-        self.value = ProjectViews(3, (View(1, "Region 1"), View(2, "Region 2")))
+        self.value = Project(ProjectId("project"), ProjectImage(b""), 3, (View(1, "Region 1"), View(2, "Region 2")))
 
-    def read_project_views(self, project_id: ProjectId) -> ProjectViews:
+    def read_project_views(self, project_id: ProjectId) -> Project:
         return self.value
 
-    def write_project_views(self, project_id: ProjectId, views: ProjectViews) -> None:
+    def write_project_views(self, project_id: ProjectId, views: Project) -> None:
         self.value = views
 
 

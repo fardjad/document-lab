@@ -11,15 +11,15 @@ try:
     from application.view.ports.view_store import ProjectViewStore
     from model.operation import Operation
     from model.pipeline import Pipeline
-    from model.project import ProjectId, ProjectImage, ProjectNotFound
-    from model.view import ProjectViews, View
+    from model.project import Project, ProjectId, ProjectImage, ProjectNotFound
+    from model.view import View
 except ImportError:
     from ...application.project.ports.project_store import ProjectStore, ProjectWriter
     from ...application.view.ports.view_store import ProjectViewStore
     from ...model.operation import Operation
     from ...model.pipeline import Pipeline
-    from ...model.project import ProjectId, ProjectImage, ProjectNotFound
-    from ...model.view import ProjectViews, View
+    from ...model.project import Project, ProjectId, ProjectImage, ProjectNotFound
+    from ...model.view import View
 
 
 class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
@@ -80,7 +80,7 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
     def replace_project_image(self, project_id: ProjectId, image: ProjectImage) -> None:
         project = self._project(project_id)
         self._atomic_write(project / "image.png", image.data)
-        self.write_project_views(project_id, ProjectViews(1))
+        self.write_project_views(project_id, Project(project_id, ProjectImage(b"")))
 
     def delete_project(self, project_id: ProjectId) -> None:
         project = self._project(project_id)
@@ -93,10 +93,10 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
             raise ValueError("Invalid project metadata path")
         return metadata
 
-    def read_project_views(self, project_id: ProjectId) -> ProjectViews:
+    def read_project_views(self, project_id: ProjectId) -> Project:
         metadata = self._metadata(project_id)
         if not metadata.exists():
-            return ProjectViews(1)
+            return Project(project_id, ProjectImage(b""))
         if not metadata.is_file():
             raise ValueError("Invalid project metadata")
         try:
@@ -110,7 +110,7 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
                 if not isinstance(raw_views, list):
                     raise ValueError
                 views = [self._view(raw) for raw in raw_views]
-                return ProjectViews(next_id, tuple(views))
+                return Project(project_id, ProjectImage(b""), next_id, tuple(views))
             if version != 3 or set(document) != {"version", "next_region_id", "regions"}:
                 raise ValueError
             next_id = document["next_region_id"]
@@ -118,7 +118,7 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
             if not isinstance(raw_regions, list):
                 raise ValueError
             views = [self._v3_view(raw) for raw in raw_regions]
-            return ProjectViews(next_id, tuple(views))
+            return Project(project_id, ProjectImage(b""), next_id, tuple(views))
         except (KeyError, TypeError, ValueError, yaml.YAMLError) as error:
             raise ValueError("Invalid project metadata") from error
 
@@ -153,18 +153,18 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
             operations.append(Operation(kind, options))
         return Pipeline(tuple(operations))
 
-    def write_project_views(self, project_id: ProjectId, views: ProjectViews) -> None:
+    def write_project_views(self, project_id: ProjectId, project: Project) -> None:
         metadata = self._metadata(project_id)
         document = {
             "version": 4,
-            "next_view_id": views.next_view_id,
+            "next_view_id": project.next_view_id,
             "views": [
                 {
                     "id": item.id,
                     "name": item.name,
                     "pipeline": [{"kind": op.kind, "options": dict(op.options)} for op in item.pipeline.operations],
                 }
-                for item in views.views
+                for item in project.views
             ],
         }
         self._atomic_write_yaml(metadata, document)

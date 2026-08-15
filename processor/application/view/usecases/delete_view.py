@@ -20,6 +20,5 @@ class DeleteView:
         project_id = project_id_or_not_found(raw_project_id)
         with view_write_lock():
             current = self._views.read_project_views(project_id)
-            self._views.write_project_views(project_id, current.remove(view_id))
-
+            self._views.write_project_views(project_id, current.remove_view(view_id))
 

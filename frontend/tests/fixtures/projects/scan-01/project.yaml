@@ -6,7 +6,6 @@ views:
     pipeline:
       - kind: crop
         options: {x: 0.1, y: 0.1, width: 0.35, height: 0.325}
-      - kind:
       - kind: rotate
         options: {degrees: 0}
       - kind: straighten

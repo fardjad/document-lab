@@ -1,9 +1,9 @@
 try:
     from application.view.ports.operation_registry import OperationExecutor
-    from model.operation_spec import OperationSpec
+    from application.view.ports.operation_spec import OperationSpec
 except ImportError:
     from ...application.view.ports.operation_registry import OperationExecutor
-    from ...model.operation_spec import OperationSpec
+    from ...application.view.ports.operation_spec import OperationSpec
 
 
 class OperationRegistryImpl:

@@ -1,6 +1,6 @@
 import unittest
 
-from model.operation_spec import OperationSpec
+from application.view.ports.operation_spec import OperationSpec
 
 
 class OperationSpecTests(unittest.TestCase):

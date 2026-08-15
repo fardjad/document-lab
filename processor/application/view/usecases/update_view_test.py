@@ -2,10 +2,11 @@ import unittest
 
 from application.view.usecases.update_view import UpdateView
 from model.operation import Operation
-from model.operation_spec import OperationSpec
+from application.view.ports.operation_spec import OperationSpec
 from model.pipeline import Pipeline
 from model.project import ProjectId, ProjectNotFound
-from model.view import View, ProjectViews, ViewNotFound
+from model.project import Project, ProjectImage
+from model.view import View, ViewNotFound
 
 
 class FakeImageSizes:
@@ -17,12 +18,12 @@ class FakeImageSizes:
 
 class FakeViewStore:
     def __init__(self) -> None:
-        self.value = ProjectViews(2, (View(1, "Region 1"),))
+        self.value = Project(ProjectId("project"), ProjectImage(b""), 2, (View(1, "Region 1"),))
 
-    def read_project_views(self, project_id: ProjectId) -> ProjectViews:
+    def read_project_views(self, project_id: ProjectId) -> Project:
         return self.value
 
-    def write_project_views(self, project_id: ProjectId, views: ProjectViews) -> None:
+    def write_project_views(self, project_id: ProjectId, views: Project) -> None:
         self.value = views
 
 
@@ -67,7 +68,7 @@ class UpdateViewTests(unittest.TestCase):
         updated = UpdateView(store, FakeRegistry(AcceptingExecutor())).update("project", 1, "Renamed", pipeline)
         self.assertEqual(pipeline, updated.pipeline)
         self.assertEqual("Renamed", updated.name)
-        self.assertEqual(updated, store.value.find(1))
+        self.assertEqual(updated, store.value.find_view(1))
 
     def test_strips_whitespace_from_name(self) -> None:
         store = FakeViewStore()
@@ -87,7 +88,7 @@ class UpdateViewTests(unittest.TestCase):
         pipeline = Pipeline((Operation("rotate", {"degrees": 999}),))
         with self.assertRaisesRegex(ValueError, "Invalid option"):
             UpdateView(store, FakeRegistry(FailingValidateExecutor())).update("project", 1, "x", pipeline)
-        self.assertEqual("Region 1", store.value.find(1).name)
+        self.assertEqual("Region 1", store.value.find_view(1).name)
 
 
 if __name__ == "__main__":

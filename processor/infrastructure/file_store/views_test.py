@@ -6,7 +6,8 @@ from infrastructure.file_store.filesystem_project_source import FilesystemProjec
 from model.operation import Operation
 from model.pipeline import Pipeline
 from model.project import ProjectId, ProjectImage, ProjectNotFound
-from model.view import ProjectViews, View
+from model.project import Project, ProjectImage
+from model.view import View
 
 PNG_HEADER = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\x0dIHDR" + b"\x00\x00\x00\x01\x00\x00\x00\x01" + b"\x08\x06\x00\x00\x00"
 
@@ -22,9 +23,9 @@ class FilesystemViewsTests(unittest.TestCase):
             root = Path(directory)
             self._project(root)
             store = FilesystemProjectStore(root)
-            self.assertEqual(ProjectViews(1), store.read_project_views(ProjectId("project")))
+            self.assertEqual(Project(ProjectId("project"), ProjectImage(b"")), store.read_project_views(ProjectId("project")))
             pipeline = Pipeline((Operation("rotate", {"degrees": 90}), Operation("straighten", {"angle": 1.5}), Operation("trim", {"top": 2, "right": 0, "bottom": 0, "left": 3}), Operation("remove_background", {"model": "u2net"})))
-            value = ProjectViews(2, (View(1, "Region 1", pipeline),))
+            value = Project(ProjectId("project"), ProjectImage(b""), 2, (View(1, "Region 1", pipeline),))
             store.write_project_views(ProjectId("project"), value)
             self.assertEqual(value, store.read_project_views(ProjectId("project")))
             text = (root / "project" / "project.yaml").read_text()
@@ -36,7 +37,7 @@ class FilesystemViewsTests(unittest.TestCase):
             root = Path(directory)
             self._project(root)
             store = FilesystemProjectStore(root)
-            value = ProjectViews(2, (View(1, "Region 1", Pipeline()),))
+            value = Project(ProjectId("project"), ProjectImage(b""), 2, (View(1, "Region 1", Pipeline()),))
             store.write_project_views(ProjectId("project"), value)
             self.assertEqual(value, store.read_project_views(ProjectId("project")))
 
@@ -129,9 +130,9 @@ class FilesystemProjectWriterTests(unittest.TestCase):
             root = Path(directory)
             store = FilesystemProjectStore(root)
             store.create_project(ProjectId("p"), ProjectImage(PNG_HEADER))
-            store.write_project_views(ProjectId("p"), ProjectViews(2, (View(1, "R", Pipeline()),)))
+            store.write_project_views(ProjectId("p"), Project(ProjectId("p"), ProjectImage(b""), 2, (View(1, "R", Pipeline()),)))
             store.replace_project_image(ProjectId("p"), ProjectImage(PNG_HEADER + b"more"))
-            self.assertEqual(ProjectViews(1), store.read_project_views(ProjectId("p")))
+            self.assertEqual(Project(ProjectId("p"), ProjectImage(b"")), store.read_project_views(ProjectId("p")))
             self.assertEqual(PNG_HEADER + b"more", (root / "p" / "image.png").read_bytes())
 
 

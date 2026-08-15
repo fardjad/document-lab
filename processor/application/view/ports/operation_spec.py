@@ -4,7 +4,7 @@ from typing import Callable
 
 @dataclass(frozen=True)
 class OperationSpec:
-    """Technology-neutral contract for an operation plugin's options."""
+    """Application/plugin contract for an operation's options."""
 
     kind: str
     schema: dict

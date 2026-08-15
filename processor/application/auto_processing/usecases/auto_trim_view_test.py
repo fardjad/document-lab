@@ -5,13 +5,14 @@ from application.auto_processing.results import AutoProcessingResult
 from model.operation import Operation
 from model.pipeline import Pipeline
 from model.project import ProjectId, ProjectImage, ProjectNotFound
-from model.view import View, ProjectViews, ViewNotFound
+from model.project import Project, ProjectImage
+from model.view import View, ViewNotFound
 from model.rendered_region import RenderedRegion
 
 
 class FakeViewStore:
-    def read_project_views(self, project_id: ProjectId) -> ProjectViews:
-        return ProjectViews(2, (View(1, "r", Pipeline((Operation("rotate", {"degrees": 90}), Operation("trim", {"left": 2})))),))
+    def read_project_views(self, project_id: ProjectId) -> Project:
+        return Project(ProjectId("project"), ProjectImage(b""), 2, (View(1, "r", Pipeline((Operation("rotate", {"degrees": 90}), Operation("trim", {"left": 2})))),))
 
 
 class FakeImageSizes:

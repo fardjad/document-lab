@@ -34,7 +34,7 @@ class UpdateView:
             for op in pipeline.operations:
                 self._registry.spec_for(op.kind).validate_options(op.options)
             updated_view = View(view_id, name, pipeline)
-            if current.find(view_id) is None:
+            if current.find_view(view_id) is None:
                 raise ViewNotFound("View not found")
-            self._views.write_project_views(project_id, current.replace(updated_view))
+            self._views.write_project_views(project_id, current.replace_view(updated_view))
             return updated_view

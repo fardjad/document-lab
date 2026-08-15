@@ -1,7 +1,7 @@
 import unittest
 
 from model.project import Project, ProjectId, ProjectImage
-from model.view import ProjectViews, View
+from model.view import View, ViewNotFound
 
 
 class ProjectIdTests(unittest.TestCase):
@@ -26,24 +26,36 @@ class ProjectImageTests(unittest.TestCase):
                 ProjectImage.from_png(data)  # type: ignore[arg-type]
 
 
-class ProjectViewsDelegationTests(unittest.TestCase):
+class ProjectViewsTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.project = Project(ProjectId("project"), ProjectImage(b"image"), ProjectViews(2, (View(1, "first"),)))
+        self.project = Project(ProjectId("project"), ProjectImage(b"image"), 2, (View(1, "first"),))
 
-    def test_find_view_delegates(self) -> None:
+    def test_find_view_returns_matching_or_none(self) -> None:
         self.assertEqual(View(1, "first"), self.project.find_view(1))
+        self.assertIsNone(self.project.find_view(2))
 
-    def test_add_view_delegates(self) -> None:
-        updated = self.project.add_view(View(2, "second"))
-        self.assertEqual((View(1, "first"), View(2, "second")), updated.views.views)
+    def test_add_view_assigns_next_id_and_never_reuses(self) -> None:
+        updated = Project(ProjectId("project"), ProjectImage(b"image"), 5).add_view(View(1, "first"))
+        self.assertEqual(5, updated.next_view_id)
+        self.assertEqual((View(1, "first"),), updated.views)
 
-    def test_replace_view_delegates(self) -> None:
+    def test_replace_view_swaps_by_id(self) -> None:
         updated = self.project.replace_view(View(1, "renamed"))
         self.assertEqual("renamed", updated.find_view(1).name)
+        with self.assertRaises(ViewNotFound):
+            Project(ProjectId("project"), ProjectImage(b"image")).replace_view(View(1, "missing"))
 
-    def test_remove_view_delegates(self) -> None:
+    def test_remove_view_deletes_by_id(self) -> None:
         updated = self.project.remove_view(1)
-        self.assertEqual((), updated.views.views)
+        self.assertEqual((), updated.views)
+        with self.assertRaises(ViewNotFound):
+            updated.remove_view(1)
+
+    def test_rejects_duplicate_or_invalid_ids(self) -> None:
+        with self.assertRaises(ValueError):
+            Project(ProjectId("project"), ProjectImage(b"image"), 1, (View(1, "a"),))
+        with self.assertRaises(ValueError):
+            Project(ProjectId("project"), ProjectImage(b"image"), 0)
 
 
 if __name__ == "__main__":

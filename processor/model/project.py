@@ -1,10 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import re
 
 try:
-    from model.view import ProjectViews, View
+    from model.view import View, ViewNotFound
 except ImportError:
-    from .view import ProjectViews, View
+    from .view import View, ViewNotFound
 
 
 class ProjectNotFound(FileNotFoundError):
@@ -40,24 +40,35 @@ class ProjectImage:
 class Project:
     id: ProjectId
     image: ProjectImage
-    views: ProjectViews = ProjectViews(1)
+    next_view_id: int = 1
+    views: tuple[View, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, ProjectId):
             raise ValueError("Invalid project ID")
         if not isinstance(self.image, ProjectImage):
             raise ValueError("Invalid project image")
-        if not isinstance(self.views, ProjectViews):
-            raise ValueError("Invalid project views")
+        if isinstance(self.next_view_id, bool) or not isinstance(self.next_view_id, int) or self.next_view_id < 1:
+            raise ValueError("Invalid next view ID")
+        object.__setattr__(self, "views", tuple(self.views))
+        if any(not isinstance(item, View) for item in self.views):
+            raise ValueError("Invalid views")
+        ids = [item.id for item in self.views]
+        if len(ids) != len(set(ids)) or self.next_view_id <= max(ids, default=0):
+            raise ValueError("Invalid view IDs")
 
     def find_view(self, view_id: int) -> View | None:
-        return self.views.find(view_id)
+        return next((item for item in self.views if item.id == view_id), None)
 
     def add_view(self, view: View) -> "Project":
-        return Project(self.id, self.image, self.views.add(view))
+        return replace(self, next_view_id=max(self.next_view_id, view.id + 1), views=self.views + (view,))
 
     def replace_view(self, view: View) -> "Project":
-        return Project(self.id, self.image, self.views.replace(view))
+        if self.find_view(view.id) is None:
+            raise ViewNotFound("View not found")
+        return replace(self, views=tuple(view if item.id == view.id else item for item in self.views))
 
     def remove_view(self, view_id: int) -> "Project":
-        return Project(self.id, self.image, self.views.remove(view_id))
+        if self.find_view(view_id) is None:
+            raise ViewNotFound("View not found")
+        return replace(self, views=tuple(item for item in self.views if item.id != view_id))

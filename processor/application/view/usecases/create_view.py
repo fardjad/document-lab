@@ -23,5 +23,5 @@ class CreateView:
         with view_write_lock():
             current = self._views.read_project_views(project_id)
             created = View(current.next_view_id, name, pipeline or Pipeline())
-            self._views.write_project_views(project_id, current.add(created))
+            self._views.write_project_views(project_id, current.add_view(created))
             return created

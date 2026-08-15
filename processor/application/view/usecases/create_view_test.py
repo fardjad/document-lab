@@ -3,7 +3,8 @@ import unittest
 from application.view.usecases.create_view import CreateView
 from model.pipeline import Pipeline
 from model.project import ProjectId, ProjectNotFound
-from model.view import View, ProjectViews
+from model.project import Project, ProjectImage
+from model.view import View
 
 
 class FakeImageSizes:
@@ -15,12 +16,12 @@ class FakeImageSizes:
 
 class FakeViewStore:
     def __init__(self) -> None:
-        self.value = ProjectViews(1)
+        self.value = Project(ProjectId("project"), ProjectImage(b""))
 
-    def read_project_views(self, project_id: ProjectId) -> ProjectViews:
+    def read_project_views(self, project_id: ProjectId) -> Project:
         return self.value
 
-    def write_project_views(self, project_id: ProjectId, views: ProjectViews) -> None:
+    def write_project_views(self, project_id: ProjectId, views: Project) -> None:
         self.value = views
 
 
@@ -36,7 +37,7 @@ class CreateViewTests(unittest.TestCase):
     def test_persists_created_view(self) -> None:
         store = FakeViewStore()
         created = CreateView(store).create("project", "New view")
-        self.assertEqual(created, store.value.find(created.id))
+        self.assertEqual(created, store.value.find_view(created.id))
 
     def test_rejects_invalid_project_id(self) -> None:
         with self.assertRaises(ProjectNotFound):
