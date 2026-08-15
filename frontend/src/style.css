@@ -1,5 +1,49 @@
 
-/* Viewer interaction overrides */
-.image-stage { transform-origin: center; cursor: grab; touch-action: none; }
+:root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+* { box-sizing: border-box; }
+html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { background: #101317; }
+
+.app { display: flex; flex-direction: row; width: 100%; height: 100%; min-width: 0; }
+.left, .right { display: flex; flex: 0 0 auto; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: #191e24; }
+.left { border-right: 1px solid #303840; }
+.right { border-left: 1px solid #303840; }
+.left.folded, .right.folded { width: 30px !important; }
+.main { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.center { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto minmax(0, auto); flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; }
+.center-pane { min-width: 0; min-height: 0; overflow: hidden; position: relative; }
+.center-pane.folded-pane { display: flex; align-items: flex-start; justify-content: center; }
+.pane-heading, .section-actions, .panel-heading { display: flex; align-items: center; }
+.pane-heading, .section-actions { justify-content: space-between; }
+.pane-heading { min-height: 56px; padding: 8px 12px; }
+.section-actions { padding: 4px 12px 8px; }
+.section-title { font-weight: 700 !important; }
+.brand { letter-spacing: .12em; font-weight: 800 !important; }
+.brand span { color: #c6f36b; }
+.project-tree, .pipeline { min-height: 0; overflow: auto; padding: 0 8px 12px; }
+.pipeline { flex: 1 1 auto; }
+.save-pipeline { margin: 0 12px 12px !important; width: calc(100% - 24px) !important; }
+.resize-handle { flex: 0 0 auto; z-index: 2; background: transparent; }
+.resize-handle.horizontal { width: 5px; cursor: col-resize; }
+.resize-handle.vertical { height: 5px; cursor: row-resize; }
+.resize-handle:hover, .resize-handle:active { background: #c6f36b; }
+.preview { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; min-height: 0; overflow: hidden; position: relative; }
+.preview-toolbar { display: flex; align-items: center; gap: 4px; position: absolute; top: 8px; right: 8px; z-index: 3; }
+.image-stage { max-width: 100%; max-height: 100%; transform-origin: center; cursor: grab; touch-action: none; position: relative; }
 .image-stage:active { cursor: grabbing; }
-.image-stage img { user-select: none; }
+.image-stage img { display: block; max-width: 100%; max-height: 100%; user-select: none; }
+.crop-layer { position: absolute; inset: 0; cursor: crosshair; }
+.crop-box { position: absolute; border: 2px solid #c6f36b; background: rgba(198, 243, 107, .14); }
+.parameters { height: 100%; overflow: auto; padding: 16px; }
+.panel-heading { justify-content: space-between; margin-bottom: 12px; }
+.operation-top { display: flex; align-items: center; gap: 8px; }
+.operation-top > .MuiBox-root { min-width: 0; }
+.helpers { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.add-operation { margin-top: 12px !important; }
+.pane-corner { position: absolute; top: 4px; right: 4px; z-index: 2; }
+.fold-button { flex: 0 0 auto; }
+.description { display: block; margin-bottom: 16px; }
+.tree-label { display: flex; align-items: center; min-width: 0; width: 100%; }
+.tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.tree-action { opacity: 0; }
+.tree-label:hover .tree-action { opacity: 1; }
