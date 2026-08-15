@@ -64,14 +64,23 @@ function CropOverlay({ imageRef, options, onChange }: { imageRef: React.RefObjec
   return <Box className="crop-layer" onPointerDown={down} onPointerMove={move} onPointerUp={e => { e.stopPropagation(); start.current = null; }}><Box className="crop-box" style={{ left: `${box.x * 100}%`, top: `${box.y * 100}%`, width: `${box.width * 100}%`, height: `${box.height * 100}%` }} /></Box>;
 }
 function Preview({ project, view, pipeline, selected, onCrop, activeEditing, onImageDimensions }: { project?: Project; view?: View; pipeline: PipelineOp[]; selected?: Metadata; onCrop: (o: Options) => void; activeEditing: boolean; onImageDimensions: (width: number, height: number) => void }) {
-  const img = useRef<HTMLImageElement>(null); const [zoom, setZoom] = useState(1); const [pan, setPan] = useState({ x: 0, y: 0 }); const [preview, setPreview] = useState("");
+  const img = useRef<HTMLImageElement>(null); const imageViewer = useRef<HTMLDivElement>(null); const [zoom, setZoom] = useState(1); const [pan, setPan] = useState({ x: 0, y: 0 }); const [preview, setPreview] = useState("");
   const dragging = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const crop = pipeline.find((o) => o.kind === "crop");
   useEffect(() => { if (!project || !view || !activeEditing) return; const timer = setTimeout(() => { const enabledPipeline = pipeline.filter(o => o.enabled !== false).map(({ kind, options }) => ({ kind, options })); fetch(`${API}/projects/${encodeURIComponent(project.id)}/views/${view.id}/preview`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pipeline: enabledPipeline }) }).then(r => r.ok ? r.blob() : Promise.reject(new Error("Preview failed"))).then(b => { const u = URL.createObjectURL(b); setPreview(old => { if (old) URL.revokeObjectURL(old); return u; }); }).catch(() => setPreview("")); }, 350); return () => clearTimeout(timer); }, [project?.id, view?.id, JSON.stringify(pipeline), activeEditing]);
   useEffect(() => { if (!activeEditing) setPreview(""); }, [activeEditing, view?.id]);
   useEffect(() => { setZoom(1); setPan({ x: 0, y: 0 }); }, [project?.id, view?.id]);
   const src = activeEditing ? (preview || project?.imageUrl) : (project && view ? `${API}/projects/${encodeURIComponent(project.id)}/views/${view.id}/render` : undefined);
-  const reset = (nextZoom = 1) => { setZoom(nextZoom); setPan({ x: 0, y: 0 }); };
+  const reset = (nextZoom?: number) => {
+    const viewer = imageViewer.current;
+    const image = img.current;
+    if (!viewer || !image || !image.naturalWidth || !image.naturalHeight) { setZoom(nextZoom ?? 1); setPan({ x: 0, y: 0 }); return; }
+    const containerWidth = viewer.clientWidth;
+    const containerHeight = viewer.clientHeight;
+    const targetZoom = nextZoom ?? Math.min(containerWidth / image.naturalWidth, containerHeight / image.naturalHeight);
+    setZoom(targetZoom);
+    setPan({ x: (containerWidth - image.naturalWidth * targetZoom) / 2, y: (containerHeight - image.naturalHeight * targetZoom) / 2 });
+  };
   const down = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     dragging.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
@@ -90,7 +99,7 @@ function Preview({ project, view, pipeline, selected, onCrop, activeEditing, onI
     e.preventDefault();
     setZoom(z => Math.max(.25, Math.min(8, z * (e.deltaY < 0 ? 1.1 : 0.9))));
   };
-  return <Box className="preview"><Box className="preview-toolbar"><Tooltip title="Fit and center"><IconButton onClick={() => reset()}><FitScreenIcon /></IconButton></Tooltip><Tooltip title="Actual size and center"><IconButton onClick={() => reset(1)}><CenterFocusStrongIcon /></IconButton></Tooltip><IconButton aria-label="Zoom out" onClick={() => setZoom(z => Math.max(.25, z / 1.25))}><ZoomOutIcon /></IconButton><Typography>{Math.round(zoom * 100)}%</Typography><IconButton aria-label="Zoom in" onClick={() => setZoom(z => Math.min(8, z * 1.25))}><ZoomInIcon /></IconButton></Box><Box className="image-viewer">{src ? <Box className="image-stage" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onWheel={wheel}><img ref={img} src={src} alt={project?.name ?? "Document"} draggable={false} style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} onLoad={e => { const image = e.currentTarget; if (!src.startsWith("blob:")) onImageDimensions(image.naturalWidth, image.naturalHeight); }} />{selected?.kind === "crop" && crop && activeEditing && <CropOverlay imageRef={img} options={crop.options} onChange={onCrop} />}</Box> : <Typography color="text.secondary">Select a view to begin editing</Typography>}</Box></Box>;
+  return <Box className="preview"><Box className="preview-toolbar"><Tooltip title="Fit and center"><IconButton onClick={() => reset()}><FitScreenIcon /></IconButton></Tooltip><Tooltip title="Actual size and center"><IconButton onClick={() => reset(1)}><CenterFocusStrongIcon /></IconButton></Tooltip><IconButton aria-label="Zoom out" onClick={() => setZoom(z => Math.max(.25, z / 1.25))}><ZoomOutIcon /></IconButton><Typography>{Math.round(zoom * 100)}%</Typography><IconButton aria-label="Zoom in" onClick={() => setZoom(z => Math.min(8, z * 1.25))}><ZoomInIcon /></IconButton></Box><Box className="image-viewer" ref={imageViewer}>{src ? <Box className="image-stage" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onWheel={wheel}><img ref={img} src={src} alt={project?.name ?? "Document"} draggable={false} style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} onLoad={e => { const image = e.currentTarget; if (!src.startsWith("blob:")) onImageDimensions(image.naturalWidth, image.naturalHeight); }} />{selected?.kind === "crop" && crop && activeEditing && <CropOverlay imageRef={img} options={crop.options} onChange={onCrop} />}</Box> : <Typography color="text.secondary">Select a view to begin editing</Typography>}</Box></Box>;
 }
 function Parameters({ meta, op, naturalWidth, naturalHeight, onChange }: { meta?: Metadata; op?: PipelineOp; naturalWidth: number; naturalHeight: number; onChange: (o: Options) => void }) {
   if (!meta || !op) return <Box className="parameters"><Typography variant="h6">Operation parameters</Typography><Typography color="text.secondary">Select an operation in the pipeline.</Typography></Box>;
