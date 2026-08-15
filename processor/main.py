@@ -1,5 +1,5 @@
 try:
-    from .application.auto_processing.usecases.invoke_helper import InvokeHelper
+    from .application.view.usecases.invoke_helper import InvokeHelper
     from .application.project.usecases.create_project import CreateProject
     from .application.project.usecases.delete_project import DeleteProject
     from .application.project.usecases.import_project import ImportProject
@@ -24,7 +24,7 @@ try:
     from .infrastructure.image_processor.operations.crop import CropOperation
     from .infrastructure.image_processor.rembg_background_remover import RembgBackgroundRemover
 except ImportError:
-    from application.auto_processing.usecases.invoke_helper import InvokeHelper
+    from application.view.usecases.invoke_helper import InvokeHelper
     from application.project.usecases.create_project import CreateProject
     from application.project.usecases.delete_project import DeleteProject
     from application.project.usecases.import_project import ImportProject

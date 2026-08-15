@@ -2,12 +2,12 @@ import cv2
 import numpy as np
 
 try:
-    from application.auto_processing.ports.document_analyzers import DocumentStraightener, DocumentTrimmer
-    from application.auto_processing.results import AutoProcessingResult
+    from application.view.ports.document_analyzers import DocumentStraightener, DocumentTrimmer
+    from application.view.ports.document_analysis_result import AutoProcessingResult
     from model.operation import Operation
 except ImportError:
-    from ...application.auto_processing.ports.document_analyzers import DocumentStraightener, DocumentTrimmer
-    from ...application.auto_processing.results import AutoProcessingResult
+    from ...application.view.ports.document_analyzers import DocumentStraightener, DocumentTrimmer
+    from ...application.view.ports.document_analysis_result import AutoProcessingResult
     from ...model.operation import Operation
 
 

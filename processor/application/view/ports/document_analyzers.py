@@ -1,9 +1,9 @@
 from typing import Protocol
 
 try:
-    from application.auto_processing.results import AutoProcessingResult
+    from application.view.ports.document_analysis_result import AutoProcessingResult
 except ImportError:
-    from ..results import AutoProcessingResult
+    from .document_analysis_result import AutoProcessingResult
 
 
 class DocumentStraightener(Protocol):

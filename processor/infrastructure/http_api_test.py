@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
 
 from infrastructure.http_api import create_app
-from application.auto_processing.usecases.invoke_helper import InvokeHelper
+from application.view.usecases.invoke_helper import InvokeHelper
 from application.project.usecases.create_project import CreateProject
 from application.project.usecases.delete_project import DeleteProject
 from application.project.usecases.import_project import ImportProject

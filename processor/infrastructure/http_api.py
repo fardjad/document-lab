@@ -4,7 +4,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 
 try:
-    from application.auto_processing.usecases.invoke_helper import InvokeHelper
+    from application.view.usecases.invoke_helper import InvokeHelper
     from application.project.usecases.create_project import CreateProject
     from application.project.usecases.delete_project import DeleteProject
     from application.project.usecases.import_project import ImportProject
@@ -22,7 +22,7 @@ try:
     from model.project import ProjectImage, ProjectNotFound
     from model.view import ViewNotFound
 except ImportError:
-    from ..application.auto_processing.usecases.invoke_helper import InvokeHelper
+    from ..application.view.usecases.invoke_helper import InvokeHelper
     from ..application.project.usecases.create_project import CreateProject
     from ..application.project.usecases.delete_project import DeleteProject
     from ..application.project.usecases.import_project import ImportProject

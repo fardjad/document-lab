@@ -1,6 +1,6 @@
 import unittest
 
-from application.auto_processing.usecases.invoke_helper import InvokeHelper
+from application.view.usecases.invoke_helper import InvokeHelper
 from application.view.ports.helper import Helper
 from application.view.ports.operation_spec import OperationSpec
 from application.view.ports.rendered_region import RenderedRegion
