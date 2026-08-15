@@ -10,7 +10,10 @@ and must not do work that belongs to another role.
 
 Plans architecture, decomposes work, spawns workers, integrates results, and
 makes decisions. Does not explore the codebase, search the web, or review
-itself — that is what workers are for.
+itself — that is what workers are for. Does not do implementation work directly
+regardless of task size. Always spawn a worker for file edits, test writing, or
+any code changes. The coordinator only plans, delegates, integrates, and
+verifies.
 
 ### Codebase exploration worker
 **Model:** `gpt-5.6-luna`
