@@ -1,6 +1,6 @@
 import unittest
 
-from application.view.usecases.render_view import ViewRenderError, RenderView
+from application.view.usecases.render_view import ViewRenderError, RenderView, cache_key_for_step
 from model.operation import Operation
 from model.pipeline import Pipeline
 from model.project import ProjectId, ProjectImage, ProjectNotFound
@@ -66,7 +66,59 @@ class FakeRegistry:
         return (self._executor.kind,)
 
 
+class RecordingCache:
+    def __init__(self) -> None:
+        self.get_calls = []
+        self.put_calls = []
+        self.values = {}
+
+    def get(self, project_id: ProjectId, cache_key: str):
+        self.get_calls.append((project_id, cache_key))
+        return self.values.get((project_id, cache_key))
+
+    def put(self, project_id: ProjectId, cache_key: str, rendered: RenderedRegion) -> None:
+        self.put_calls.append((project_id, cache_key, rendered))
+        self.values[(project_id, cache_key)] = rendered
+
+    def cleanup(self, project_id: ProjectId) -> None:
+        pass
+
+
 class RenderViewTests(unittest.TestCase):
+    def test_cache_key_is_stable_for_same_operations(self) -> None:
+        operations = (Operation("rotate", {"degrees": 90}),)
+        self.assertEqual(cache_key_for_step(operations, 0), cache_key_for_step(operations, 0))
+
+    def test_cache_key_changes_when_options_change(self) -> None:
+        first = (Operation("rotate", {"degrees": 90}),)
+        second = (Operation("rotate", {"degrees": 180}),)
+        self.assertNotEqual(cache_key_for_step(first, 0), cache_key_for_step(second, 0))
+
+    def test_cache_key_excludes_disabled_operations(self) -> None:
+        with_disabled = (Operation("rotate", {"degrees": 90}, False), Operation("trim", {"top": 1}))
+        without_disabled = (Operation("trim", {"top": 1}),)
+        self.assertEqual(cache_key_for_step(with_disabled, 1), cache_key_for_step(without_disabled, 0))
+
+    def test_cache_key_changes_for_later_pipeline_step(self) -> None:
+        operations = (Operation("rotate", {"degrees": 90}), Operation("trim", {"top": 1}))
+        self.assertNotEqual(cache_key_for_step(operations, 0), cache_key_for_step(operations, 1))
+
+    def test_render_checks_cache_for_each_step_and_reuses_hits(self) -> None:
+        executor = RecordingExecutor()
+        cache = RecordingCache()
+        usecase = RenderView(FakeViewStore(), FakeReader(), FakeImageSizes(), FakeRegistry(executor), cache)
+
+        first = usecase.render("project", 1)
+        self.assertEqual(3, len(cache.get_calls))
+        self.assertEqual(3, len(cache.put_calls))
+        self.assertEqual(3, len(executor.render_calls))
+
+        second = usecase.render("project", 1)
+        self.assertEqual(first, second)
+        self.assertEqual(6, len(cache.get_calls))
+        self.assertEqual(3, len(cache.put_calls))
+        self.assertEqual(3, len(executor.render_calls))
+
     def test_render_loads_view_and_applies_pipeline_operations(self) -> None:
         executor = RecordingExecutor()
         registry = FakeRegistry(executor)
