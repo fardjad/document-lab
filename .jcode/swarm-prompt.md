@@ -76,23 +76,24 @@ Every model below is route-pinned to the `opencode-go` provider (`openai-compati
 
 ## Result delivery (critical for reliability)
 
-Worker results are only reliably delivered to the coordinator when the worker
-explicitly sends them. A worker that silently completes may show up as "unknown"
-status with no readable report; `read_context`/`read`/`status` can then return
-nothing or a swarm-membership error. To prevent lost results:
+The `report` action with `status: "ready"` and `message` set to the full report
+is the SOLE reliable delivery mechanism. The message body appears in the
+`await_members` completion notification.
 
-- When spawning a worker, instruct it in the prompt to DIRECT-MESSAGE the
-  coordinator with its full report, then call `report` with `status: "ready"`
-  and the same report as `message`.
-- After a worker exits, read its result through the message it sent or the
-  `report` body — NOT by polling `status` or `read_context`, which are
-  unreliable once the peer session is no longer reachable.
-- If a worker resolves with unknown status and no DM/report is readable, treat
-  it as a lost result. Do NOT retry the identical spawn more than once blindly.
-  Instead respawn once with an explicit DM-back instruction, and if that also
-  fails, surface the swarm-delivery problem to the user and stop.
-- Do not loop on `status`/`read_context` polling. Set up `await_members` once,
-  wait for the wake, then read the delivered message.
+- When spawning a worker, instruct it: "When done, call `report` with `status:
+  \"ready\"` and your full report as `message`. Do not DM. Do not just end
+  your turn without calling report."
+- Do NOT instruct workers to DM the coordinator. DMs are never readable via
+  `read` or `read_context`.
+- After a worker exits, read its result from the `await_members` completion
+  notification ONLY. Never use `read`, `read_context`, or `status` to retrieve a
+  completed worker's output — they fail with membership errors.
+- If a worker resolves with "unknown" status and no message in the completion
+  notification, it did not call `report`. Respawn once with a stronger
+  instruction to call `report` with `message`. If the respawn also produces no
+  message, surface the problem to the user and stop.
+- Do not poll `status`/`read_context`. Set up `await_members` once, wait for the
+  wake notification, and read the delivered message.
 
 ## Worker scope
 
@@ -103,10 +104,12 @@ needs fixing, it reports it to the coordinator and waits — it does not edit.
 
 ## Garbled or corrupt worker output
 
-A worker may resolve cleanly with status ready and a DM, but the DM body is
+A worker may resolve cleanly with status ready, but the report message may be
 unreadable: degenerate token repetition, nonsense tokens, or truncation that
 destroys meaning. This is a degraded-output failure, not a lost-result
-failure. Handle it as follows:
+failure. The report message may also be truncated by the delivery system. If
+the completion notification contains the report but it is truncated, check if
+a DM was also sent (unlikely); otherwise respawn once. Handle it as follows:
 
 - Never reverse-engineer or trust a verdict pulled from garbled text. If a
   report is not plain, coherent prose, it is not a result.
