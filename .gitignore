@@ -24,6 +24,7 @@ dist/
 *.tsbuildinfo
 test-results/
 playwright-report/
+blob-report/
 
 # OS and editor files
 .DS_Store
@@ -35,5 +36,8 @@ Desktop.ini
 *.swo
 *~
 
-# Local project data
-projects/
+# Local project data (repo-root only; test fixtures live under frontend/tests/fixtures/projects)
+/projects/
+
+# Local-only project journal
+/JOURNAL.md
