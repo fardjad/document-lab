@@ -1,4 +1,4 @@
-version: 1
+version: 3
 next_region_id: 2
 regions:
   - id: 1
@@ -8,3 +8,10 @@ regions:
       y: 0.1
       width: 0.35
       height: 0.325
+    pipeline:
+      - kind: rotate
+        options: {degrees: 0}
+      - kind: straighten
+        options: {angle: 0.0}
+      - kind: trim
+        options: {top: 0, right: 0, bottom: 0, left: 0}

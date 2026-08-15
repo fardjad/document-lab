@@ -2,7 +2,19 @@ import unittest
 from unittest import mock
 
 from infrastructure.image_processor.rembg_background_remover import RembgBackgroundRemover
-from model.project import BackgroundRemoval
+
+
+def _settings(**overrides) -> dict:
+    base = {
+        "model": "birefnet-general",
+        "alpha_matting": False,
+        "alpha_matting_foreground_threshold": 240,
+        "alpha_matting_background_threshold": 10,
+        "alpha_matting_erode_size": 10,
+        "post_process_mask": False,
+    }
+    base.update(overrides)
+    return base
 
 
 class RembgBackgroundRemoverTests(unittest.TestCase):
@@ -11,7 +23,7 @@ class RembgBackgroundRemoverTests(unittest.TestCase):
             remove.return_value = b"png"
             new_session.return_value = "session"
             remover = RembgBackgroundRemover()
-            settings = BackgroundRemoval(model="u2net", alpha_matting=True, alpha_matting_foreground_threshold=200, alpha_matting_background_threshold=20, alpha_matting_erode_size=15, post_process_mask=True)
+            settings = _settings(model="u2net", alpha_matting=True, alpha_matting_foreground_threshold=200, alpha_matting_background_threshold=20, alpha_matting_erode_size=15, post_process_mask=True)
             result = remover.remove(b"png", settings)
             remover.remove(b"png", settings)
             self.assertEqual(b"png", result)
@@ -30,7 +42,7 @@ class RembgBackgroundRemoverTests(unittest.TestCase):
             remove.return_value = None
             new_session.return_value = "session"
             with self.assertRaisesRegex(ValueError, "Background removal produced no image"):
-                RembgBackgroundRemover().remove(b"png", BackgroundRemoval())
+                RembgBackgroundRemover().remove(b"png", _settings())
 
 
 if __name__ == "__main__":

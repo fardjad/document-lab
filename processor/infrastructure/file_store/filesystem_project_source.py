@@ -1,21 +1,28 @@
 from pathlib import Path
 import os
+import shutil
 import struct
 import tempfile
 
 import yaml
 
 try:
-    from application.project_access.ports.project_source import ProjectSource
-    from model.project import BackgroundRemoval, CropRectangle, CropRegion, ProjectId, ProjectImage, ProjectNotFound, ProjectRegions, RegionTrim
-    from application.region_management.ports.project_region_store import ProjectRegionStore
+    from application.project.ports.project_store import ProjectStore, ProjectWriter
+    from application.region.ports.region_store import ProjectRegionStore
+    from model.operation import Operation
+    from model.pipeline import Pipeline
+    from model.project import ProjectId, ProjectImage, ProjectNotFound
+    from model.region import CropRectangle, CropRegion, ProjectRegions
 except ImportError:
-    from ...application.project_access.ports.project_source import ProjectSource
-    from ...model.project import BackgroundRemoval, CropRectangle, CropRegion, ProjectId, ProjectImage, ProjectNotFound, ProjectRegions, RegionTrim
-    from ...application.region_management.ports.project_region_store import ProjectRegionStore
+    from ...application.project.ports.project_store import ProjectStore, ProjectWriter
+    from ...application.region.ports.region_store import ProjectRegionStore
+    from ...model.operation import Operation
+    from ...model.pipeline import Pipeline
+    from ...model.project import ProjectId, ProjectImage, ProjectNotFound
+    from ...model.region import CropRectangle, CropRegion, ProjectRegions
 
 
-class FilesystemProjectStore(ProjectSource, ProjectRegionStore):
+class FilesystemProjectStore(ProjectStore, ProjectRegionStore, ProjectWriter):
     def __init__(self, root: str | Path) -> None:
         self._root = Path(root).resolve()
 
@@ -57,6 +64,28 @@ class FilesystemProjectStore(ProjectSource, ProjectRegionStore):
             raise ValueError("Invalid PNG image")
         return width, height
 
+    def create_project(self, project_id: ProjectId, image: ProjectImage) -> None:
+        project = (self._root / project_id.value).resolve()
+        if project.parent != self._root:
+            raise ValueError("Invalid project path")
+        if project.exists():
+            raise FileExistsError("Project already exists")
+        project.mkdir(parents=False, exist_ok=False)
+        try:
+            self._atomic_write(project / "image.png", image.data)
+        except BaseException:
+            shutil.rmtree(project, ignore_errors=True)
+            raise
+
+    def replace_project_image(self, project_id: ProjectId, image: ProjectImage) -> None:
+        project = self._project(project_id)
+        self._atomic_write(project / "image.png", image.data)
+        self.write_project_regions(project_id, ProjectRegions(1))
+
+    def delete_project(self, project_id: ProjectId) -> None:
+        project = self._project(project_id)
+        shutil.rmtree(project)
+
     def _metadata(self, project_id: ProjectId) -> Path:
         project = self._project(project_id)
         metadata = (project / "project.yaml").resolve()
@@ -72,7 +101,8 @@ class FilesystemProjectStore(ProjectSource, ProjectRegionStore):
             raise ValueError("Invalid project metadata")
         try:
             document = yaml.safe_load(metadata.read_text())
-            if not isinstance(document, dict) or document.get("version") != 1:
+            version = document.get("version") if isinstance(document, dict) else None
+            if version != 3:
                 raise ValueError
             if set(document) != {"version", "next_region_id", "regions"}:
                 raise ValueError
@@ -80,53 +110,88 @@ class FilesystemProjectStore(ProjectSource, ProjectRegionStore):
             raw_regions = document["regions"]
             if not isinstance(raw_regions, list):
                 raise ValueError
-            regions = []
-            for raw in raw_regions:
-                if not isinstance(raw, dict) or not set(raw).issubset({"id", "name", "rectangle", "rotation", "straighten", "trim", "background_removal"}) or set(raw) < {"id", "name", "rectangle"}:
-                    raise ValueError
-                rectangle = raw["rectangle"]
-                if not isinstance(rectangle, dict) or set(rectangle) != {"x", "y", "width", "height"}:
-                    raise ValueError
-                trim = raw.get("trim", {"top": 0, "right": 0, "bottom": 0, "left": 0})
-                if not isinstance(trim, dict) or set(trim) != {"top", "right", "bottom", "left"}:
-                    raise ValueError
-                removal = None
-                if "background_removal" in raw:
-                    raw_removal = raw["background_removal"]
-                    if not isinstance(raw_removal, dict) or set(raw_removal) != {"model", "alpha_matting", "alpha_matting_foreground_threshold", "alpha_matting_background_threshold", "alpha_matting_erode_size", "post_process_mask"}:
-                        raise ValueError
-                    removal = BackgroundRemoval(raw_removal["model"], raw_removal["alpha_matting"], raw_removal["alpha_matting_foreground_threshold"], raw_removal["alpha_matting_background_threshold"], raw_removal["alpha_matting_erode_size"], raw_removal["post_process_mask"])
-                regions.append(CropRegion(raw["id"], raw["name"], CropRectangle(rectangle["x"], rectangle["y"], rectangle["width"], rectangle["height"]), raw.get("rotation", 0), raw.get("straighten", 0.0), RegionTrim(trim["top"], trim["right"], trim["bottom"], trim["left"]), removal))
+            regions = [self._region(raw) for raw in raw_regions]
             return ProjectRegions(next_id, tuple(regions))
         except (KeyError, TypeError, ValueError, yaml.YAMLError) as error:
             raise ValueError("Invalid project metadata") from error
 
+    def _region(self, raw) -> CropRegion:
+        if not isinstance(raw, dict) or not set(raw).issubset({"id", "name", "rectangle", "pipeline"}) or set(raw) < {"id", "name", "rectangle"}:
+            raise ValueError
+        rectangle = raw["rectangle"]
+        if not isinstance(rectangle, dict) or set(rectangle) != {"x", "y", "width", "height"}:
+            raise ValueError
+        return CropRegion(raw["id"], raw["name"], CropRectangle(rectangle["x"], rectangle["y"], rectangle["width"], rectangle["height"]), self._pipeline(raw.get("pipeline")))
+
+    def _pipeline(self, raw) -> Pipeline:
+        if raw is None:
+            return Pipeline()
+        if not isinstance(raw, list):
+            raise ValueError
+        operations = []
+        for entry in raw:
+            if not isinstance(entry, dict) or set(entry) != {"kind", "options"}:
+                raise ValueError
+            kind = entry["kind"]
+            options = entry["options"]
+            if not isinstance(kind, str) or not kind or not isinstance(options, dict):
+                raise ValueError
+            operations.append(Operation(kind, options))
+        return Pipeline(tuple(operations))
+
     def write_project_regions(self, project_id: ProjectId, regions: ProjectRegions) -> None:
         metadata = self._metadata(project_id)
         document = {
-            "version": 1,
+            "version": 3,
             "next_region_id": regions.next_region_id,
             "regions": [
-                {**{"id": item.id, "name": item.name, "rotation": item.rotation, "straighten": item.straighten, "trim": {"top": item.trim.top, "right": item.trim.right, "bottom": item.trim.bottom, "left": item.trim.left}}, **({"background_removal": {"model": item.background_removal.model, "alpha_matting": item.background_removal.alpha_matting, "alpha_matting_foreground_threshold": item.background_removal.alpha_matting_foreground_threshold, "alpha_matting_background_threshold": item.background_removal.alpha_matting_background_threshold, "alpha_matting_erode_size": item.background_removal.alpha_matting_erode_size, "post_process_mask": item.background_removal.post_process_mask}} if item.background_removal is not None else {}), "rectangle": {"x": item.rectangle.x, "y": item.rectangle.y, "width": item.rectangle.width, "height": item.rectangle.height}}
+                {
+                    "id": item.id,
+                    "name": item.name,
+                    "pipeline": [{"kind": op.kind, "options": dict(op.options)} for op in item.pipeline.operations],
+                    "rectangle": {"x": item.rectangle.x, "y": item.rectangle.y, "width": item.rectangle.width, "height": item.rectangle.height},
+                }
                 for item in regions.regions
             ],
         }
-        payload = yaml.safe_dump(document, sort_keys=False)
-        descriptor, temporary = tempfile.mkstemp(prefix=".project.yaml.", dir=metadata.parent)
+        self._atomic_write_yaml(metadata, document)
+
+    def _atomic_write(self, target: Path, data: bytes) -> None:
+        descriptor, temporary = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
         try:
-            with os.fdopen(descriptor, "w") as stream:
-                stream.write(payload)
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(data)
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temporary, metadata)
-            directory = os.open(metadata.parent, os.O_DIRECTORY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
+            os.replace(temporary, target)
+            self._fsync_directory(target.parent)
         except BaseException:
             try:
                 os.unlink(temporary)
             except FileNotFoundError:
                 pass
             raise
+
+    def _atomic_write_yaml(self, target: Path, document: dict) -> None:
+        payload = yaml.safe_dump(document, sort_keys=False)
+        descriptor, temporary = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+        try:
+            with os.fdopen(descriptor, "w") as stream:
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, target)
+            self._fsync_directory(target.parent)
+        except BaseException:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+            raise
+
+    def _fsync_directory(self, directory: Path) -> None:
+        descriptor = os.open(directory, os.O_DIRECTORY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)

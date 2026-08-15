@@ -1,0 +1,14 @@
+# Project-level Jcode configuration for document-cropper.
+# This file is read in addition to ~/.jcode/config.toml.
+
+[provider]
+# Coordinator / planning / orchestration model.
+# glm-5.2 is served through the OpenCode Go provider.
+default_provider = "opencode-go"
+default_model = "glm-5.2"
+
+[agents]
+# Swarm worker model pin. Spawned workers inherit this model instead of
+# the coordinator's, so expensive planning and cheap execution are split.
+# Route-pinned to OpenCode Go so spawns don't fall back to OpenAI credentials.
+swarm_model = "opencode-go:gpt-5.6-luna"

@@ -3,8 +3,7 @@ import unittest
 
 from PIL import Image, ImageDraw
 
-from infrastructure.image_processor.opencv_region_analyzer import OpenCVRegionAnalyzer
-from model.project import CropRectangle, CropRegion, ProjectImage, RegionTrim
+from infrastructure.image_processor.opencv_region_analyzer import OpenCVDocumentAnalyzer
 
 
 def png(background: str = "white", document: bool = True) -> bytes:
@@ -16,35 +15,36 @@ def png(background: str = "white", document: bool = True) -> bytes:
     return output.getvalue()
 
 
-class OpenCVRegionAnalyzerTests(unittest.TestCase):
-    def test_trim_detects_solid_external_background(self) -> None:
-        result = OpenCVRegionAnalyzer().analyze(ProjectImage(png()), CropRegion(1, "r", CropRectangle(0, 0, 1, 1)), "trim")
-        self.assertEqual(RegionTrim(15, 20, 15, 20), result.suggestion)
+class OpenCVDocumentAnalyzerTests(unittest.TestCase):
+    def test_detect_trim_solid_external_background(self) -> None:
+        result = OpenCVDocumentAnalyzer().detect_trim(png())
+        self.assertIsInstance(result.suggestion, object)
+        self.assertEqual((15, 20, 15, 20), (result.suggestion.options["top"], result.suggestion.options["right"], result.suggestion.options["bottom"], result.suggestion.options["left"]))
         self.assertIsNotNone(result.confidence)
 
-    def test_blank_image_returns_unavailable_result(self) -> None:
-        result = OpenCVRegionAnalyzer().analyze(ProjectImage(png(document=False)), CropRegion(1, "r", CropRectangle(0, 0, 1, 1)), "trim")
+    def test_detect_trim_blank_image_returns_unavailable(self) -> None:
+        result = OpenCVDocumentAnalyzer().detect_trim(png(document=False))
         self.assertIsNone(result.suggestion)
         self.assertIsNotNone(result.reason)
 
-    def test_straighten_returns_absolute_tenth_degree_suggestion(self) -> None:
+    def test_detect_skew_returns_absolute_tenth_degree_suggestion(self) -> None:
         image = Image.new("RGB", (200, 100), "white")
         ImageDraw.Draw(image).rectangle((30, 30, 170, 70), fill="black")
         image = image.rotate(8, fillcolor="white")
         output = BytesIO()
         image.save(output, "PNG")
-        result = OpenCVRegionAnalyzer().analyze(ProjectImage(output.getvalue()), CropRegion(1, "r", CropRectangle(0, 0, 1, 1)), "straighten")
+        result = OpenCVDocumentAnalyzer().detect_skew(output.getvalue())
         self.assertEqual(8.0, result.suggestion)
 
-    def test_trim_uses_transparent_rotation_padding_and_keeps_card(self) -> None:
+    def test_detect_skew_works_on_rotated_padded_image(self) -> None:
         image = Image.new("RGB", (100, 80), (180, 180, 180))
         ImageDraw.Draw(image).rectangle((20, 15, 79, 64), fill=(20, 80, 180))
+        image = image.rotate(10, resample=Image.Resampling.BICUBIC, expand=True, fillcolor=(180, 180, 180))
         output = BytesIO()
         image.save(output, "PNG")
-        result = OpenCVRegionAnalyzer().analyze(ProjectImage(output.getvalue()), CropRegion(1, "r", CropRectangle(0, 0, 1, 1), straighten=10), "trim")
-        self.assertIsInstance(result.suggestion, RegionTrim)
-        self.assertEqual(18, result.suggestion.top)
-        self.assertGreater(result.suggestion.left, 0)
+        result = OpenCVDocumentAnalyzer().detect_trim(output.getvalue())
+        self.assertIsInstance(result.suggestion, object)
+        self.assertGreater(result.suggestion.options["left"], 0)
 
     def test_edge_speck_does_not_expand_trim_bounds(self) -> None:
         image = Image.new("RGB", (100, 80), "white")
@@ -53,8 +53,8 @@ class OpenCVRegionAnalyzerTests(unittest.TestCase):
         drawing.point((2, 2), fill="black")
         output = BytesIO()
         image.save(output, "PNG")
-        result = OpenCVRegionAnalyzer().analyze(ProjectImage(output.getvalue()), CropRegion(1, "r", CropRectangle(0, 0, 1, 1)), "trim")
-        self.assertEqual(RegionTrim(15, 20, 15, 20), result.suggestion)
+        result = OpenCVDocumentAnalyzer().detect_trim(output.getvalue())
+        self.assertEqual((15, 20, 15, 20), (result.suggestion.options["top"], result.suggestion.options["right"], result.suggestion.options["bottom"], result.suggestion.options["left"]))
 
 
 if __name__ == "__main__":

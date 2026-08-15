@@ -1,73 +1,73 @@
-from dataclasses import replace
-
 import cv2
 import numpy as np
 
 try:
-    from application.region_analysis.results import AnalysisResult
-    from model.project import CropRegion, ProjectImage, RegionTrim
-    from infrastructure.image_processor.pillow_region_renderer import PillowRegionRenderer
+    from application.auto_processing.ports.document_analyzers import DocumentStraightener, DocumentTrimmer
+    from application.auto_processing.results import AutoProcessingResult
+    from model.operation import Operation
 except ImportError:
-    from ...application.region_analysis.results import AnalysisResult
-    from ...model.project import CropRegion, ProjectImage, RegionTrim
-    from .pillow_region_renderer import PillowRegionRenderer
+    from ...application.auto_processing.ports.document_analyzers import DocumentStraightener, DocumentTrimmer
+    from ...application.auto_processing.results import AutoProcessingResult
+    from ...model.operation import Operation
 
 
-class OpenCVRegionAnalyzer:
-    def __init__(self, renderer: PillowRegionRenderer | None = None) -> None:
-        self._renderer = renderer or PillowRegionRenderer()
+class OpenCVDocumentAnalyzer(DocumentStraightener, DocumentTrimmer):
+    """Draft-only automatic suggestions; confirmation through region update is the only persistence path."""
 
-    def analyze(self, image: ProjectImage, region: CropRegion, operation: str) -> AnalysisResult:
-        transformed_region = replace(region, trim=RegionTrim(), straighten=0.0 if operation == "straighten" else region.straighten)
-        transformed = self._renderer.render(image, transformed_region)
-        pixels = cv2.imdecode(np.frombuffer(transformed, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
+    def __init__(self) -> None:
+        pass
+
+    def detect_skew(self, rendered: bytes) -> AutoProcessingResult:
+        return self._straighten(self._decode(rendered))
+
+    def detect_trim(self, rendered: bytes) -> AutoProcessingResult:
+        return self._trim(self._decode(rendered))
+
+    def _decode(self, rendered: bytes) -> np.ndarray:
+        pixels = cv2.imdecode(np.frombuffer(rendered, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
         if pixels is None:
             raise ValueError("Unable to decode source image")
         if pixels.size == 0:
             raise ValueError("Region output is empty")
-        if operation == "straighten":
-            return self._straighten(pixels)
-        if operation == "trim":
-            return self._trim(pixels)
-        raise ValueError("Unsupported analysis operation")
+        return pixels
 
-    def _straighten(self, image: np.ndarray) -> AnalysisResult:
+    def _straighten(self, image: np.ndarray) -> AutoProcessingResult:
         mask = self._foreground_mask(image)
         components, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
         if components <= 1:
-            return AnalysisResult(None, None, "No reliable document edges found")
+            return AutoProcessingResult(None, None, "No reliable document edges found")
         label = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
         points = cv2.findNonZero(np.where(labels == label, 255, 0).astype(np.uint8))
         if points is None or len(points) < 20:
-            return AnalysisResult(None, None, "No reliable document edges found")
+            return AutoProcessingResult(None, None, "No reliable document edges found")
         _, (width, height), angle = cv2.minAreaRect(points)
         if width < 2 or height < 2:
-            return AnalysisResult(None, None, "No reliable document edges found")
+            return AutoProcessingResult(None, None, "No reliable document edges found")
         correction = -angle if width >= height else 90 - angle
         while correction > 45:
             correction -= 90
         while correction < -45:
             correction += 90
         if abs(correction) > 15 or abs(correction) < 0.05:
-            return AnalysisResult(None, None, "Detected skew is outside conservative correction range")
-        return AnalysisResult(round(correction, 1), min(1.0, max(0.0, 1.0 - abs(correction) / 15)), "Detected document edge skew")
+            return AutoProcessingResult(None, None, "Detected skew is outside conservative correction range")
+        return AutoProcessingResult(round(correction, 1), min(1.0, max(0.0, 1.0 - abs(correction) / 15)), "Detected document edge skew")
 
-    def _trim(self, image: np.ndarray) -> AnalysisResult:
+    def _trim(self, image: np.ndarray) -> AutoProcessingResult:
         mask = self._foreground_mask(image)
         if not np.any(mask):
-            return AnalysisResult(None, None, "No reliable foreground found")
+            return AutoProcessingResult(None, None, "No reliable foreground found")
         components, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
         if components <= 1:
-            return AnalysisResult(None, None, "No reliable foreground found")
+            return AutoProcessingResult(None, None, "No reliable foreground found")
         label = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
         points = cv2.findNonZero(np.where(labels == label, 255, 0).astype(np.uint8))
         if points is None or stats[label, cv2.CC_STAT_AREA] < 20:
-            return AnalysisResult(None, None, "No reliable foreground found")
+            return AutoProcessingResult(None, None, "No reliable foreground found")
         x, y, width, height = cv2.boundingRect(points)
-        trim = RegionTrim(y, image.shape[1] - (x + width), image.shape[0] - (y + height), x)
-        if trim == RegionTrim():
-            return AnalysisResult(None, None, "No external background to trim")
-        return AnalysisResult(trim, 0.9, "Detected perimeter-connected background")
+        trim = Operation("trim", {"top": y, "right": image.shape[1] - (x + width), "bottom": image.shape[0] - (y + height), "left": x})
+        if (y, image.shape[1] - (x + width), image.shape[0] - (y + height), x) == (0, 0, 0, 0):
+            return AutoProcessingResult(None, None, "No external background to trim")
+        return AutoProcessingResult(trim, 0.9, "Detected perimeter-connected background")
 
     def _foreground_mask(self, image: np.ndarray) -> np.ndarray:
         if image.ndim == 2:

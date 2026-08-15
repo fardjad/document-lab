@@ -2,11 +2,6 @@ from threading import Lock
 
 from rembg import new_session, remove
 
-try:
-    from model.project import BackgroundRemoval
-except ImportError:
-    from ...model.project import BackgroundRemoval
-
 
 class RembgBackgroundRemover:
     def __init__(self) -> None:
@@ -29,18 +24,18 @@ class RembgBackgroundRemover:
                 self._sessions[model] = session
                 return session
 
-    def remove(self, image: bytes, settings: BackgroundRemoval) -> bytes:
-        if not isinstance(settings, BackgroundRemoval):
+    def remove(self, image: bytes, settings: dict) -> bytes:
+        if not isinstance(settings, dict):
             raise ValueError("Invalid background removal settings")
-        session = self._session(settings.model)
+        session = self._session(settings["model"])
         result = remove(
             image,
             session=session,
-            alpha_matting=settings.alpha_matting,
-            alpha_matting_foreground_threshold=settings.alpha_matting_foreground_threshold,
-            alpha_matting_background_threshold=settings.alpha_matting_background_threshold,
-            alpha_matting_erode_size=settings.alpha_matting_erode_size,
-            post_process_mask=settings.post_process_mask,
+            alpha_matting=settings["alpha_matting"],
+            alpha_matting_foreground_threshold=settings["alpha_matting_foreground_threshold"],
+            alpha_matting_background_threshold=settings["alpha_matting_background_threshold"],
+            alpha_matting_erode_size=settings["alpha_matting_erode_size"],
+            post_process_mask=settings["post_process_mask"],
             force_return_bytes=True,
         )
         if not isinstance(result, bytes):

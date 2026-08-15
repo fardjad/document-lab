@@ -7,6 +7,8 @@ async function clientAsset() {
   return new Response(result.outputs[0], { headers: { "Content-Type": "application/javascript" } });
 }
 
+const backendPort = Number(process.env.BACKEND_PORT || 8000);
+
 Bun.serve({
   port: Number(process.env.PORT || 3000),
   routes: {
@@ -16,7 +18,9 @@ Bun.serve({
     "/assets/main.css": new Response(Bun.file(isProduction ? "./dist/assets/main.css" : "./src/style.css"), { headers: { "Content-Type": "text/css" } }),
     "/src/style.css": new Response(Bun.file("./src/style.css"), { headers: { "Content-Type": "text/css" } }),
   },
-  fetch() {
+  async fetch(request) {
+    const url = new URL(request.url);
+    if (url.pathname.startsWith("/api/")) return fetch(new Request(`http://127.0.0.1:${backendPort}${url.pathname}${url.search}`, request));
     return new Response("Not found", { status: 404 });
   },
 });
