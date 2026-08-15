@@ -53,6 +53,31 @@ class RegionTrim:
             raise ValueError("Invalid region trim")
 
 
+BACKGROUND_REMOVAL_MODELS = ("birefnet-general", "isnet-general-use", "u2net", "u2netp", "silueta")
+
+
+@dataclass(frozen=True)
+class BackgroundRemoval:
+    model: str = "birefnet-general"
+    alpha_matting: bool = False
+    alpha_matting_foreground_threshold: int = 240
+    alpha_matting_background_threshold: int = 10
+    alpha_matting_erode_size: int = 10
+    post_process_mask: bool = False
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.model, str) or self.model not in BACKGROUND_REMOVAL_MODELS:
+            raise ValueError("Invalid background removal model")
+        if any(not isinstance(value, bool) for value in (self.alpha_matting, self.post_process_mask)):
+            raise ValueError("Invalid background removal flag")
+        thresholds = (self.alpha_matting_foreground_threshold, self.alpha_matting_background_threshold)
+        if any(isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 255 for value in thresholds):
+            raise ValueError("Invalid background removal threshold")
+        erode = self.alpha_matting_erode_size
+        if isinstance(erode, bool) or not isinstance(erode, int) or not 1 <= erode <= 100:
+            raise ValueError("Invalid background removal erode size")
+
+
 @dataclass(frozen=True)
 class CropRegion:
     id: int
@@ -61,6 +86,7 @@ class CropRegion:
     rotation: int = 0
     straighten: float = 0.0
     trim: RegionTrim = RegionTrim()
+    background_removal: BackgroundRemoval | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.id, bool) or not isinstance(self.id, int) or self.id < 1:
@@ -81,6 +107,8 @@ class CropRegion:
         object.__setattr__(self, "straighten", 0.0 if canonical == 0 else canonical)
         if not isinstance(self.trim, RegionTrim):
             raise ValueError("Invalid region trim")
+        if self.background_removal is not None and not isinstance(self.background_removal, BackgroundRemoval):
+            raise ValueError("Invalid background removal")
 
 
 @dataclass(frozen=True)

@@ -2,10 +2,10 @@ from threading import Lock
 import math
 
 try:
-    from model.project import CropRectangle, CropRegion, ProjectId, ProjectRegions, ProjectNotFound, RegionNotFound, RegionTrim
+    from model.project import BackgroundRemoval, CropRectangle, CropRegion, ProjectId, ProjectRegions, ProjectNotFound, RegionNotFound, RegionTrim
     from application.region_management.ports.project_region_store import ProjectRegionStore
 except ImportError:
-    from ....model.project import CropRectangle, CropRegion, ProjectId, ProjectRegions, ProjectNotFound, RegionNotFound, RegionTrim
+    from ....model.project import BackgroundRemoval, CropRectangle, CropRegion, ProjectId, ProjectRegions, ProjectNotFound, RegionNotFound, RegionTrim
     from ..ports.project_region_store import ProjectRegionStore
 
 
@@ -29,13 +29,13 @@ class RegionCommands:
             self._store.write_project_regions(project_id, updated)
             return created
 
-    def update_region(self, raw_project_id: str, region_id: int, name: str, rectangle: CropRectangle, rotation: int, straighten: float, trim: RegionTrim) -> CropRegion:
+    def update_region(self, raw_project_id: str, region_id: int, name: str, rectangle: CropRectangle, rotation: int, straighten: float, trim: RegionTrim, background_removal: BackgroundRemoval | None = None) -> CropRegion:
         project_id = self._project_id(raw_project_id)
         name = self._name(name)
         with _SLICE_LOCK:
             current = self._store.read_project_regions(project_id)
             self._validate_transform(project_id, rectangle, rotation, straighten, trim)
-            updated_region = CropRegion(region_id, name, rectangle, rotation, straighten, trim)
+            updated_region = CropRegion(region_id, name, rectangle, rotation, straighten, trim, background_removal)
             if not any(item.id == region_id for item in current.regions):
                 raise RegionNotFound("Region not found")
             updated = ProjectRegions(current.next_region_id, tuple(updated_region if item.id == region_id else item for item in current.regions))

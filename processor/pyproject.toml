@@ -8,6 +8,7 @@ dependencies = [
     "opencv-python-headless>=5.0.0.93",
     "pillow>=12.3.0",
     "pyyaml>=6.0.3",
+    "rembg[cpu]>=2.0.60",
 ]
 
 [tool.fastapi]

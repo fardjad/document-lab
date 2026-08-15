@@ -7,11 +7,11 @@ import yaml
 
 try:
     from application.project_access.ports.project_source import ProjectSource
-    from model.project import CropRectangle, CropRegion, ProjectId, ProjectImage, ProjectNotFound, ProjectRegions, RegionTrim
+    from model.project import BackgroundRemoval, CropRectangle, CropRegion, ProjectId, ProjectImage, ProjectNotFound, ProjectRegions, RegionTrim
     from application.region_management.ports.project_region_store import ProjectRegionStore
 except ImportError:
     from ...application.project_access.ports.project_source import ProjectSource
-    from ...model.project import CropRectangle, CropRegion, ProjectId, ProjectImage, ProjectNotFound, ProjectRegions, RegionTrim
+    from ...model.project import BackgroundRemoval, CropRectangle, CropRegion, ProjectId, ProjectImage, ProjectNotFound, ProjectRegions, RegionTrim
     from ...application.region_management.ports.project_region_store import ProjectRegionStore
 
 
@@ -82,7 +82,7 @@ class FilesystemProjectStore(ProjectSource, ProjectRegionStore):
                 raise ValueError
             regions = []
             for raw in raw_regions:
-                if not isinstance(raw, dict) or not set(raw).issubset({"id", "name", "rectangle", "rotation", "straighten", "trim"}) or set(raw) < {"id", "name", "rectangle"}:
+                if not isinstance(raw, dict) or not set(raw).issubset({"id", "name", "rectangle", "rotation", "straighten", "trim", "background_removal"}) or set(raw) < {"id", "name", "rectangle"}:
                     raise ValueError
                 rectangle = raw["rectangle"]
                 if not isinstance(rectangle, dict) or set(rectangle) != {"x", "y", "width", "height"}:
@@ -90,7 +90,13 @@ class FilesystemProjectStore(ProjectSource, ProjectRegionStore):
                 trim = raw.get("trim", {"top": 0, "right": 0, "bottom": 0, "left": 0})
                 if not isinstance(trim, dict) or set(trim) != {"top", "right", "bottom", "left"}:
                     raise ValueError
-                regions.append(CropRegion(raw["id"], raw["name"], CropRectangle(rectangle["x"], rectangle["y"], rectangle["width"], rectangle["height"]), raw.get("rotation", 0), raw.get("straighten", 0.0), RegionTrim(trim["top"], trim["right"], trim["bottom"], trim["left"])))
+                removal = None
+                if "background_removal" in raw:
+                    raw_removal = raw["background_removal"]
+                    if not isinstance(raw_removal, dict) or set(raw_removal) != {"model", "alpha_matting", "alpha_matting_foreground_threshold", "alpha_matting_background_threshold", "alpha_matting_erode_size", "post_process_mask"}:
+                        raise ValueError
+                    removal = BackgroundRemoval(raw_removal["model"], raw_removal["alpha_matting"], raw_removal["alpha_matting_foreground_threshold"], raw_removal["alpha_matting_background_threshold"], raw_removal["alpha_matting_erode_size"], raw_removal["post_process_mask"])
+                regions.append(CropRegion(raw["id"], raw["name"], CropRectangle(rectangle["x"], rectangle["y"], rectangle["width"], rectangle["height"]), raw.get("rotation", 0), raw.get("straighten", 0.0), RegionTrim(trim["top"], trim["right"], trim["bottom"], trim["left"]), removal))
             return ProjectRegions(next_id, tuple(regions))
         except (KeyError, TypeError, ValueError, yaml.YAMLError) as error:
             raise ValueError("Invalid project metadata") from error
@@ -101,7 +107,7 @@ class FilesystemProjectStore(ProjectSource, ProjectRegionStore):
             "version": 1,
             "next_region_id": regions.next_region_id,
             "regions": [
-                {"id": item.id, "name": item.name, "rotation": item.rotation, "straighten": item.straighten, "trim": {"top": item.trim.top, "right": item.trim.right, "bottom": item.trim.bottom, "left": item.trim.left}, "rectangle": {"x": item.rectangle.x, "y": item.rectangle.y, "width": item.rectangle.width, "height": item.rectangle.height}}
+                {**{"id": item.id, "name": item.name, "rotation": item.rotation, "straighten": item.straighten, "trim": {"top": item.trim.top, "right": item.trim.right, "bottom": item.trim.bottom, "left": item.trim.left}}, **({"background_removal": {"model": item.background_removal.model, "alpha_matting": item.background_removal.alpha_matting, "alpha_matting_foreground_threshold": item.background_removal.alpha_matting_foreground_threshold, "alpha_matting_background_threshold": item.background_removal.alpha_matting_background_threshold, "alpha_matting_erode_size": item.background_removal.alpha_matting_erode_size, "post_process_mask": item.background_removal.post_process_mask}} if item.background_removal is not None else {}), "rectangle": {"x": item.rectangle.x, "y": item.rectangle.y, "width": item.rectangle.width, "height": item.rectangle.height}}
                 for item in regions.regions
             ],
         }

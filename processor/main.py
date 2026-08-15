@@ -6,6 +6,8 @@ try:
     from .infrastructure.image_processor.pillow_region_renderer import PillowRegionRenderer
     from .application.region_analysis.usecases.analyze_region import RegionAnalysis
     from .infrastructure.image_processor.opencv_region_analyzer import OpenCVRegionAnalyzer
+    from .application.region_background.usecases.remove_background import RegionBackgroundRemoval
+    from .infrastructure.image_processor.rembg_background_remover import RembgBackgroundRemover
     from .config.settings import Settings
     from .infrastructure.http_api import create_app
 except ImportError:
@@ -16,6 +18,8 @@ except ImportError:
     from infrastructure.image_processor.pillow_region_renderer import PillowRegionRenderer
     from application.region_analysis.usecases.analyze_region import RegionAnalysis
     from infrastructure.image_processor.opencv_region_analyzer import OpenCVRegionAnalyzer
+    from application.region_background.usecases.remove_background import RegionBackgroundRemoval
+    from infrastructure.image_processor.rembg_background_remover import RembgBackgroundRemover
     from config.settings import Settings
     from infrastructure.http_api import create_app
 
@@ -23,4 +27,5 @@ except ImportError:
 settings = Settings.from_environment()
 store = FilesystemProjectStore(settings.project_root)
 renderer = PillowRegionRenderer()
-app = create_app(ProjectQueries(store), settings.cors_origins, RegionCommands(store), RegionExport(store, store, renderer), RegionAnalysis(store, store, OpenCVRegionAnalyzer(renderer)))
+remover = RembgBackgroundRemover()
+app = create_app(ProjectQueries(store), settings.cors_origins, RegionCommands(store), RegionExport(store, store, renderer, remover), RegionAnalysis(store, store, OpenCVRegionAnalyzer(renderer)), RegionBackgroundRemoval(store, store, renderer, remover))
