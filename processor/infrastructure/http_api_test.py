@@ -108,7 +108,7 @@ class HttpApiIntegrationTests(unittest.TestCase):
         self.assertIn("attachment", download.headers["content-disposition"])
         with Image.open(BytesIO(download.content)) as image:
             self.assertEqual((120, 90), image.size)
-        preview = self.client.post("/api/projects/scan/views/1/render", json={"operations": [{"kind": "rotate", "options": {"degrees": 90}}]})
+        preview = self.client.post("/api/projects/scan/views/1/render", json={"operations": [{"kind": "crop", "options": {"x": 0, "y": 0, "width": 0.5, "height": 0.5555555555555556}}, {"kind": "rotate", "options": {"degrees": 90}}]})
         self.assertEqual(200, preview.status_code)
         self.assertNotIn("content-disposition", preview.headers)
         with Image.open(BytesIO(preview.content)) as image:
