@@ -14,6 +14,7 @@ try:
     from .application.view.usecases.update_view import UpdateView
     from .config.settings import Settings
     from .infrastructure.file_store.filesystem_project_source import FilesystemProjectStore
+    from .infrastructure.file_store.render_cache import FileRenderCache
     from .infrastructure.http_api import create_app
     from .infrastructure.image_processor.opencv_view_analyzer import OpenCVDocumentAnalyzer
     from .infrastructure.image_processor.operations.remove_background import RemoveBackgroundOperation
@@ -39,6 +40,7 @@ except ImportError:
     from application.view.usecases.update_view import UpdateView
     from config.settings import Settings
     from infrastructure.file_store.filesystem_project_source import FilesystemProjectStore
+    from infrastructure.file_store.render_cache import FileRenderCache
     from infrastructure.http_api import create_app
     from infrastructure.image_processor.opencv_view_analyzer import OpenCVDocumentAnalyzer
     from infrastructure.image_processor.operations.remove_background import RemoveBackgroundOperation
@@ -52,6 +54,7 @@ except ImportError:
 
 settings = Settings.from_environment()
 store = FilesystemProjectStore(settings.project_root)
+cache = FileRenderCache(settings.project_root, settings.cache_ttl_seconds)
 background_remover = RembgBackgroundRemover()
 analyzer = OpenCVDocumentAnalyzer()
 straighten = StraightenOperation(analyzer)
@@ -63,6 +66,8 @@ registry = OperationRegistryImpl([
     CropOperation(),
     RemoveBackgroundOperation(background_remover),
 ])
+for project_id in store.list_project_ids():
+    cache.cleanup(project_id)
 list_projects = ListProjects(store)
 read_project_image = ReadProjectImage(store)
 read_project_image_size = ReadProjectImageSize(store)
@@ -78,7 +83,7 @@ app = create_app(
     CreateView(store),
     UpdateView(store, registry),
     DeleteView(store),
-    RenderView(store, read_project_image, read_project_image_size, registry),
+    RenderView(store, read_project_image, read_project_image_size, registry, cache),
     InvokeHelper(store, read_project_image, read_project_image_size, registry),
     registry,
 )

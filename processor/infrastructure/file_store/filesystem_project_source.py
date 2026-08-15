@@ -80,6 +80,7 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
     def replace_project_image(self, project_id: ProjectId, image: ProjectImage) -> None:
         project = self._project(project_id)
         self._atomic_write(project / "image.png", image.data)
+        shutil.rmtree(project / "cache", ignore_errors=True)
         self.write_project_views(project_id, Project(project_id, ProjectImage(b"")))
 
     def delete_project(self, project_id: ProjectId) -> None:
