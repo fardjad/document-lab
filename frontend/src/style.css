@@ -31,3 +31,18 @@
 .header-tools .view-presets, .header-tools .zoom-tools { display: none; }
 .header-tools button, .region-menu button, .slice-actions button, .straighten-tools button, .trim-tools button { min-width: 34px; min-height: 34px; display: inline-grid; place-items: center; }
 @media (max-width: 600px) { .viewer-toolbar { max-width: calc(100% - 24px); bottom: max(10px, env(safe-area-inset-bottom)); } .viewer-toolbar button { width: 34px; height: 34px; } }
+.background-active .region-tool, .background-active .rotation-tools, .background-active .straighten-tool, .background-active .trim-tool { display: none; }
+header.background-active { height: auto; min-height: 104px; padding: 20px 40px; }
+.background-tools { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+.background-tools select { height: 30px; border: 1px solid #414348; border-radius: 4px; padding: 0 8px; background: #17181acc; color: #e9e6df; font: 11px 'DM Mono', monospace; cursor: pointer; }
+.background-tools select:focus-visible { outline: 2px solid #d3f36b; outline-offset: 2px; }
+.background-tools select option { background: #17181a; color: #e9e6df; }
+.background-toggle { display: inline-flex; align-items: center; gap: 6px; color: #aeb0b3; font: 10px 'DM Mono', monospace; white-space: nowrap; }
+.background-toggle input { accent-color: #d3f36b; cursor: pointer; }
+.background-toggle input:disabled { cursor: default; }
+.background-number { display: inline-flex; align-items: center; gap: 5px; color: #85878c; font: 10px 'DM Mono', monospace; white-space: nowrap; }
+.background-number input { width: 56px; height: 30px; padding: 0 6px; border: 1px solid #414348; border-radius: 4px; background: #17181acc; color: #e9e6df; text-align: center; font: 11px 'DM Mono', monospace; }
+.background-number input:focus-visible { outline: 2px solid #d3f36b; outline-offset: 2px; }
+.background-action { min-width: 32px; height: 30px; padding: 0 8px !important; display: inline-grid; place-items: center; }
+.background-action.confirm { color: #151713 !important; background: #d3f36b !important; border-color: #d3f36b !important; font-weight: 600; }
+.image-window.rendered-view .image-surface { background-color: #202225; background-image: linear-gradient(45deg, #25272a 25%, transparent 25%), linear-gradient(-45deg, #25272a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #25272a 75%), linear-gradient(-45deg, transparent 75%, #25272a 75%); background-size: 12px 12px; background-position: 0 0, 0 6px, 6px -6px, -6px 0; }
