@@ -59,17 +59,38 @@ function ProjectTree({ projects, selectedProject, selectedView, onProject, onVie
 function CropOverlay({ imageRef, options, onChange }: { imageRef: React.RefObject<HTMLImageElement | null>; options: Options; onChange: (o: Options) => void }) {
   const box = { x: Number(options.x ?? 0), y: Number(options.y ?? 0), width: Number(options.width ?? 1), height: Number(options.height ?? 1) };
   const start = useRef<{ x: number; y: number } | null>(null);
-  const down = (e: ReactPointerEvent) => { const img = imageRef.current; if (!img) return; const r = img.getBoundingClientRect(); start.current = { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)) }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); };
+  const down = (e: ReactPointerEvent) => { e.stopPropagation(); const img = imageRef.current; if (!img) return; const r = img.getBoundingClientRect(); start.current = { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)) }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); };
   const move = (e: ReactPointerEvent) => { if (!start.current || !imageRef.current) return; const r = imageRef.current.getBoundingClientRect(); const x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)); onChange({ ...options, x: Math.min(start.current.x, x), y: Math.min(start.current.y, y), width: Math.abs(x - start.current.x), height: Math.abs(y - start.current.y) }); };
-  return <Box className="crop-layer" onPointerDown={down} onPointerMove={move} onPointerUp={() => { start.current = null; }}><Box className="crop-box" style={{ left: `${box.x * 100}%`, top: `${box.y * 100}%`, width: `${box.width * 100}%`, height: `${box.height * 100}%` }} /></Box>;
+  return <Box className="crop-layer" onPointerDown={down} onPointerMove={move} onPointerUp={e => { e.stopPropagation(); start.current = null; }}><Box className="crop-box" style={{ left: `${box.x * 100}%`, top: `${box.y * 100}%`, width: `${box.width * 100}%`, height: `${box.height * 100}%` }} /></Box>;
 }
 function Preview({ project, view, pipeline, selected, onCrop, activeEditing }: { project?: Project; view?: View; pipeline: PipelineOp[]; selected?: Metadata; onCrop: (o: Options) => void; activeEditing: boolean }) {
-  const img = useRef<HTMLImageElement>(null); const [zoom, setZoom] = useState(1); const [preview, setPreview] = useState("");
+  const img = useRef<HTMLImageElement>(null); const [zoom, setZoom] = useState(1); const [pan, setPan] = useState({ x: 0, y: 0 }); const [preview, setPreview] = useState("");
+  const dragging = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const crop = pipeline.find((o) => o.kind === "crop");
   useEffect(() => { if (!project || !view || !activeEditing) return; const timer = setTimeout(() => { fetch(`${API}/projects/${encodeURIComponent(project.id)}/views/${view.id}/preview`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pipeline }) }).then(r => r.ok ? r.blob() : Promise.reject(new Error("Preview failed"))).then(b => { const u = URL.createObjectURL(b); setPreview(old => { if (old) URL.revokeObjectURL(old); return u; }); }).catch(() => setPreview("")); }, 350); return () => clearTimeout(timer); }, [project?.id, view?.id, JSON.stringify(pipeline), activeEditing]);
   useEffect(() => { if (!activeEditing) setPreview(""); }, [activeEditing, view?.id]);
+  useEffect(() => { setZoom(1); setPan({ x: 0, y: 0 }); }, [project?.id, view?.id]);
   const src = preview || project?.imageUrl;
-  return <Box className="preview"><Box className="preview-toolbar"><Tooltip title="Fit"><IconButton onClick={() => setZoom(1)}><FitScreenIcon /></IconButton></Tooltip><Tooltip title="Actual size"><IconButton onClick={() => setZoom(1.5)}><CenterFocusStrongIcon /></IconButton></Tooltip><IconButton onClick={() => setZoom(z => Math.max(.25, z - .25))}><ZoomOutIcon /></IconButton><Typography>{Math.round(zoom * 100)}%</Typography><IconButton onClick={() => setZoom(z => Math.min(4, z + .25))}><ZoomInIcon /></IconButton></Box>{src ? <Box className="image-stage"><img ref={img} src={src} alt={project?.name ?? "Document"} style={{ transform: `scale(${zoom})` }} />{selected?.kind === "crop" && crop && <CropOverlay imageRef={img} options={crop.options} onChange={onCrop} />}</Box> : <Typography color="text.secondary">Select a view to begin editing</Typography>}</Box>;
+  const reset = (nextZoom = 1) => { setZoom(nextZoom); setPan({ x: 0, y: 0 }); };
+  const down = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    dragging.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const move = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!dragging.current) return;
+    const d = dragging.current;
+    setPan({ x: d.panX + e.clientX - d.x, y: d.panY + e.clientY - d.y });
+  };
+  const up = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    dragging.current = null;
+  };
+  const wheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setZoom(z => Math.max(.25, Math.min(4, z + (e.deltaY < 0 ? .1 : -.1))));
+  };
+  return <Box className="preview"><Box className="preview-toolbar"><Tooltip title="Fit and center"><IconButton onClick={() => reset()}><FitScreenIcon /></IconButton></Tooltip><Tooltip title="Actual size and center"><IconButton onClick={() => reset(1.5)}><CenterFocusStrongIcon /></IconButton></Tooltip><IconButton aria-label="Zoom out" onClick={() => setZoom(z => Math.max(.25, z - .25))}><ZoomOutIcon /></IconButton><Typography>{Math.round(zoom * 100)}%</Typography><IconButton aria-label="Zoom in" onClick={() => setZoom(z => Math.min(4, z + .25))}><ZoomInIcon /></IconButton></Box>{src ? <Box className="image-stage" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onWheel={wheel} style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}><img ref={img} src={src} alt={project?.name ?? "Document"} draggable={false} />{selected?.kind === "crop" && crop && activeEditing && <CropOverlay imageRef={img} options={crop.options} onChange={onCrop} />}</Box> : <Typography color="text.secondary">Select a view to begin editing</Typography>}</Box>;
 }
 function Parameters({ meta, op, onChange }: { meta?: Metadata; op?: PipelineOp; onChange: (o: Options) => void }) {
   if (!meta || !op) return <Box className="parameters"><Typography variant="h6">Operation parameters</Typography><Typography color="text.secondary">Select an operation in the pipeline.</Typography></Box>;
