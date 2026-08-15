@@ -21,6 +21,16 @@ Backend uses explicit, meaningful layers. Required layout: `processor/model/`, `
 - Prefer model placement when logic expresses domain meaning; prefer application placement when it coordinates a use case.
 - Do not put route handlers, request parsing, framework setup, or runtime wiring in application or model code.
 
+### Domain model
+
+The model layer contains only pure domain entities and value objects: `Project` (owns `ProjectId`, `ProjectImage`, `next_view_id`, and a tuple of `View` objects directly), `View(id, name, pipeline)`, `Pipeline(operations)`, and `Operation(kind, options)`. No technology details, no image bytes, no validation specs, and no render state belong here. `RenderedRegion` and `OperationSpec` are port contract types living in the application layer.
+
+Views do not have crop coordinates as a property. Crop is a pipeline operation (typically the first step) with normalized rectangle options. Trim is a separate operation using integer edge pixel counts. Both are infra plugins; either can achieve the other's result with different input semantics.
+
+Pipeline render fold (crop and all operations applied sequentially) stays in the application use case, never as a method on model types.
+
+Each operation plugin owns its own spec, executor, and validator in the same infrastructure module (e.g. `rotate.py` defines both `RotateExecutor` and the rotate validation). There is no central spec file. The application layer `OperationSpecRegistry` port resolves specs by kind; `UpdateView` validates options through this port without importing image libraries.
+
 ### Infrastructure and config
 
 - Put FastAPI routes and inbound HTTP translation in infrastructure; keep filesystem integration in `processor/infrastructure/file_store/` and image-library integration in infrastructure capability packages.
