@@ -92,6 +92,10 @@ def _operation_index(usecase, project_id: str, view_id: int, helper_name: str) -
         registered = usecase.registry.get(operation.kind)
         if any(helper.name == helper_name for helper in registered.helpers):
             return index
+    for kind in usecase.registry.kinds():
+        registered = usecase.registry.get(kind)
+        if any(helper.name == helper_name for helper in registered.helpers):
+            return len(view.pipeline.operations)
     raise ValueError(f"Unknown helper: {helper_name}")
 
 

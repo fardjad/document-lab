@@ -52,7 +52,19 @@ class InvokeHelper:
                 continue
             rendered = self.registry.get(operation.kind).render(rendered, operation.options)
 
-        registered = self.registry.get(target_operation.kind if target_operation is not None else helper_name.removeprefix("auto_"))
+        if target_operation is not None:
+            registered = self.registry.get(target_operation.kind)
+        else:
+            registered = next(
+                (
+                    self.registry.get(kind)
+                    for kind in self.registry.kinds()
+                    if any(helper.name == helper_name for helper in self.registry.get(kind).helpers)
+                ),
+                None,
+            )
+            if registered is None:
+                raise ValueError(f"Unknown helper: {helper_name}")
         try:
             helper = next(helper for helper in registered.helpers if helper.name == helper_name)
         except StopIteration as error:
