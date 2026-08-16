@@ -45,6 +45,21 @@ test("imports an image without crashing when the create response has no views", 
   expect(pageErrors).toEqual([]);
 });
 
+test("keeps the parameters expand control visible after folding", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Add operation" }).click();
+  await page.getByRole("button", { name: "Crop", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Crop parameters", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Collapse parameters" }).click();
+  const expandParameters = page.getByRole("button", { name: "Expand parameters" });
+  await expect(expandParameters).toBeVisible();
+
+  await expandParameters.click();
+  await expect(page.getByRole("button", { name: "Collapse parameters" })).toBeVisible();
+});
+
 test("renames a project and updates the tree without reloading", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("treeitem", { name: "scan-01" })).toBeVisible();
