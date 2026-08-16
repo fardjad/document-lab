@@ -6,6 +6,7 @@ try:
     from .application.project.usecases.read_project_image import ReadProjectImage
     from .application.project.usecases.read_project_image_size import ReadProjectImageSize
     from .application.project.usecases.update_project import UpdateProject
+    from .application.project.usecases.rename_project import RenameProject
     from .application.view.usecases.create_view import CreateView
     from .application.view.usecases.delete_view import DeleteView
     from .application.view.usecases.list_views import ListViews
@@ -31,6 +32,7 @@ except ImportError:
     from application.project.usecases.read_project_image import ReadProjectImage
     from application.project.usecases.read_project_image_size import ReadProjectImageSize
     from application.project.usecases.update_project import UpdateProject
+    from application.project.usecases.rename_project import RenameProject
     from application.view.usecases.create_view import CreateView
     from application.view.usecases.delete_view import DeleteView
     from application.view.usecases.list_views import ListViews
@@ -83,4 +85,5 @@ app = create_app(
     RenderView(store, read_project_image, read_project_image_size, registry, cache),
     InvokeHelper(store, read_project_image, read_project_image_size, registry),
     registry,
+    RenameProject(store, store),
 )

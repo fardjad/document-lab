@@ -14,6 +14,7 @@ from application.project.usecases.list_projects import ListProjects
 from application.project.usecases.read_project_image import ReadProjectImage
 from application.project.usecases.read_project_image_size import ReadProjectImageSize
 from application.project.usecases.update_project import UpdateProject
+from application.project.usecases.rename_project import RenameProject
 from application.view.usecases.delete_view import DeleteView
 from application.view.usecases.list_views import ListViews
 from application.view.usecases.create_view import CreateView
@@ -55,7 +56,7 @@ class HttpApiIntegrationTests(unittest.TestCase):
         sizes = ReadProjectImageSize(store)
         analyzer = OpenCVDocumentAnalyzer()
         registry = OperationRegistryImpl([RotateOperation(), StraightenOperation(analyzer), TrimOperation(analyzer), CropOperation(), RemoveBackgroundOperation(PassthroughRemover())])
-        self.client = TestClient(create_app(ListProjects(store), reader, ["http://test"], CreateProject(store, store), UpdateProject(store, store), DeleteProject(store, store), ListViews(store), CreateView(store), UpdateView(store, registry), DeleteView(store), RenderView(store, reader, sizes, registry), InvokeHelper(store, reader, sizes, registry)))
+        self.client = TestClient(create_app(ListProjects(store), reader, ["http://test"], CreateProject(store, store), UpdateProject(store, store), DeleteProject(store, store), ListViews(store), CreateView(store), UpdateView(store, registry), DeleteView(store), RenderView(store, reader, sizes, registry), InvokeHelper(store, reader, sizes, registry), rename_project=RenameProject(store, store)))
 
     def test_project_lifecycle_end_to_end(self) -> None:
         created = self.client.post("/api/projects", files={"image": ("scan.png", png(), "image/png")})
@@ -75,6 +76,14 @@ class HttpApiIntegrationTests(unittest.TestCase):
 
     def test_project_path_traversal_is_404(self) -> None:
         self.assertEqual(404, self.client.get("/api/projects/..%2Foutside/views").status_code)
+
+    def test_project_rename_persists_display_name_without_changing_id(self) -> None:
+        self.client.post("/api/projects", files={"image": ("scan.png", png(), "image/png")})
+        response = self.client.put("/api/projects/scan/name", json={"name": "  Receipts  "})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"id": "scan", "name": "Receipts"}, response.json())
+        self.assertEqual([{"id": "scan", "name": "Receipts"}], self.client.get("/api/projects/details").json())
+        self.assertEqual(422, self.client.put("/api/projects/scan/name", json={"name": "\n"}).status_code)
 
     def test_view_crud_with_pipeline_round_trip(self) -> None:
         self.client.post("/api/projects", files={"image": ("scan.png", png(), "image/png")})

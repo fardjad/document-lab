@@ -33,3 +33,25 @@ test("loads the app and adds a crop operation to the fixture", async ({ page }) 
   await expect(page.getByRole("heading", { name: "Crop parameters", exact: true })).toBeVisible();
   expect(pageErrors).toEqual([]);
 });
+
+test("imports an image without crashing when the create response has no views", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles("tests/fixtures/projects/scan-01/image.png");
+
+  await expect(page.getByRole("treeitem", { name: "image" })).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
+test("renames a project and updates the tree without reloading", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("treeitem", { name: "scan-01" })).toBeVisible();
+  await page.getByRole("button", { name: "Rename project scan-01" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Rename project");
+  await page.getByLabel("Project name").fill("Receipts");
+  await page.getByRole("button", { name: "Rename", exact: true }).click();
+  await expect(page.getByRole("treeitem", { name: "Receipts" })).toBeVisible();
+  await expect(page.getByRole("treeitem", { name: "scan-01" })).not.toBeVisible();
+});

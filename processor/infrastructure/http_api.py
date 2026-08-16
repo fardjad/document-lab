@@ -13,6 +13,7 @@ try:
     from application.project.usecases.list_projects import ListProjects
     from application.project.usecases.read_project_image import ReadProjectImage
     from application.project.usecases.update_project import UpdateProject
+    from application.project.usecases.rename_project import RenameProject
     from application.view.usecases.delete_view import DeleteView
     from application.view.usecases.list_views import ListViews
     from application.view.usecases.create_view import CreateView
@@ -30,6 +31,7 @@ except ImportError:
     from ..application.project.usecases.list_projects import ListProjects
     from ..application.project.usecases.read_project_image import ReadProjectImage
     from ..application.project.usecases.update_project import UpdateProject
+    from ..application.project.usecases.rename_project import RenameProject
     from ..application.view.usecases.delete_view import DeleteView
     from ..application.view.usecases.list_views import ListViews
     from ..application.view.usecases.create_view import CreateView
@@ -66,6 +68,11 @@ class PreviewRequest(BaseModel):
     pipeline: list[OperationRequest]
 
 
+class RenameProjectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+
+
 def _pipeline(request: list[OperationRequest]) -> Pipeline:
     return Pipeline(tuple(Operation(op.kind, dict(op.options), op.enabled) for op in request))
 
@@ -74,7 +81,10 @@ def _view_response(item) -> dict:
     return {
         "id": item.id,
         "name": item.name,
-        "pipeline": [{"kind": op.kind, "options": dict(op.options), "enabled": op.enabled} for op in item.pipeline.operations],
+        "pipeline": [
+            {"kind": op.kind, "options": dict(op.options), **({"enabled": False} if not op.enabled else {})}
+            for op in item.pipeline.operations
+        ],
     }
 
 
@@ -114,6 +124,7 @@ def create_app(
     render_view: RenderView,
     invoke_helper: InvokeHelper,
     registry=None,
+    rename_project: RenameProject | None = None,
 ) -> FastAPI:
     application = FastAPI(title="Document Cropper Processor")
     application.add_middleware(
@@ -153,6 +164,10 @@ def create_app(
     def projects() -> list[str]:
         return list_projects.list()
 
+    @application.get("/api/projects/details")
+    def project_details() -> list[dict[str, str]]:
+        return list_projects.list_with_names()
+
     @application.post("/api/projects", status_code=201)
     def create_project_endpoint(image: UploadFile) -> dict:
         data = image.file.read()
@@ -164,6 +179,18 @@ def create_app(
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         return {"id": str(created)}
+
+    @application.put("/api/projects/{project_id}/name")
+    def rename_project_endpoint(project_id: str, request: RenameProjectRequest) -> dict[str, str]:
+        if rename_project is None:
+            raise HTTPException(status_code=500, detail="Project rename is unavailable")
+        try:
+            name = rename_project.rename(project_id, request.name)
+        except ProjectNotFound as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return {"id": project_id, "name": name}
 
     @application.put("/api/projects/{project_id}")
     def update_project_endpoint(project_id: str, image: UploadFile) -> Response:

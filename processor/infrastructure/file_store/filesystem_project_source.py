@@ -64,6 +64,21 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
             raise ValueError("Invalid PNG image")
         return width, height
 
+    def read_project_name(self, project_id: ProjectId) -> str:
+        metadata = self._metadata(project_id)
+        if not metadata.exists():
+            return project_id.value
+        try:
+            document = yaml.safe_load(metadata.read_text())
+            name = document.get("name") if isinstance(document, dict) else None
+            if name is None:
+                return project_id.value
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError
+            return name
+        except (TypeError, ValueError, yaml.YAMLError) as error:
+            raise ValueError("Invalid project metadata") from error
+
     def create_project(self, project_id: ProjectId, image: ProjectImage) -> None:
         project = (self._root / project_id.value).resolve()
         if project.parent != self._root:
@@ -103,8 +118,9 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
         try:
             document = yaml.safe_load(metadata.read_text())
             version = document.get("version") if isinstance(document, dict) else None
-            if version == 4:
-                if set(document) != {"version", "next_view_id", "views"}:
+            if version in (4, 5):
+                expected = {"version", "next_view_id", "views"} | ({"name"} if version == 5 else set())
+                if set(document) != expected:
                     raise ValueError
                 next_id = document["next_view_id"]
                 raw_views = document["views"]
@@ -157,8 +173,9 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
 
     def write_project_views(self, project_id: ProjectId, project: Project) -> None:
         metadata = self._metadata(project_id)
+        named = metadata.exists() and "name" in (yaml.safe_load(metadata.read_text()) or {})
         document = {
-            "version": 4,
+            "version": 5 if named else 4,
             "next_view_id": project.next_view_id,
             "views": [
                 {
@@ -169,6 +186,24 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
                 for item in project.views
             ],
         }
+        if named:
+            document["name"] = self.read_project_name(project_id)
+            document = {"version": document.pop("version"), "name": document.pop("name"), **document}
+        self._atomic_write_yaml(metadata, document)
+
+    def rename_project(self, project_id: ProjectId, name: str) -> None:
+        metadata = self._metadata(project_id)
+        if not metadata.exists():
+            document = {"version": 5, "name": name, "next_view_id": 1, "views": []}
+        else:
+            try:
+                document = yaml.safe_load(metadata.read_text())
+            except yaml.YAMLError as error:
+                raise ValueError("Invalid project metadata") from error
+            if not isinstance(document, dict):
+                raise ValueError("Invalid project metadata")
+            document["name"] = name
+            document["version"] = 5
         self._atomic_write_yaml(metadata, document)
 
     def _atomic_write(self, target: Path, data: bytes) -> None:
