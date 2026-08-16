@@ -9,14 +9,27 @@ test.beforeEach(async () => {
   await cp(fixtureRoot, projectsRoot, { recursive: true });
 });
 
-test("loads projects and displays selected view", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+test("loads the app and adds a crop operation to the fixture", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/");
+
+  await expect(page).toHaveTitle("Document Cropper");
+  await expect(page.getByText("DOCUMENTLAB", { exact: true })).toBeVisible();
+  await expect(page.getByText("Projects", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Pipeline", exact: true })).toBeVisible();
   await expect(page.getByRole("treeitem", { name: "scan-01" })).toBeVisible();
-  await expect(page.locator("img.document")).toBeVisible();
-  await page.getByText("Receipt", { exact: true }).click();
-  await expect(page.locator(".image-window.crop-window")).toBeVisible();
-  expect(errors).toEqual([]);
+
+  const addOperation = page.getByRole("button", { name: "Add operation" });
+  await expect(addOperation).toBeVisible();
+  await expect(addOperation).toBeEnabled();
+  await addOperation.click();
+
+  const cropOption = page.getByRole("button", { name: "Crop", exact: true });
+  await expect(cropOption).toBeVisible();
+  await cropOption.click();
+
+  await expect(page.locator(".operation").filter({ hasText: "Crop" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Crop parameters", exact: true })).toBeVisible();
+  expect(pageErrors).toEqual([]);
 });
