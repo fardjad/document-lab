@@ -24,9 +24,9 @@ import type {
   PipelineOp,
   Project,
 } from "../../entities";
-import { Parameters, Pipeline, opMeta } from "../pipeline/PipelineControls";
-import { usePipeline } from "../pipeline/usePipeline";
-import { Preview } from "../pipeline/Preview";
+import { Parameters, Pipeline, opMeta } from "./PipelineControls";
+import { usePipeline } from "./usePipeline";
+import { Preview } from "./Preview";
 import { FoldButton, ResizeHandle } from "../../shared/ui";
 
 export function ViewWorkspace({
@@ -69,6 +69,39 @@ export function ViewWorkspace({
     selectedOperation === null
       ? undefined
       : opMeta(metas, pipeline[selectedOperation]?.kind);
+  const resizeParameters = (delta: number) => {
+    if (parametersFolded && delta >= 0) return;
+    const height = Math.max(1, document.querySelector(".center")?.clientHeight ?? 1);
+    setSplitRatio((ratio) => {
+      const next = Math.max(0, Math.min(1, ratio + delta / height));
+      setParametersFolded(next === 1);
+      return next;
+    });
+  };
+  const resizeRight = (delta: number) => {
+    if (rightFolded && delta >= 0) return;
+    setRightWidth((width) => {
+      const next = Math.max(0, Math.min(500, width - delta));
+      setRightFolded(next === 0);
+      return next;
+    });
+  };
+  const toggleParametersFold = () => {
+    if (parametersFolded) {
+      if (splitRatio === 1) setSplitRatio(0.68);
+      setParametersFolded(false);
+      return;
+    }
+    setParametersFolded(true);
+  };
+  const toggleRightFold = () => {
+    if (rightFolded) {
+      if (rightWidth === 0) setRightWidth(340);
+      setRightFolded(false);
+      return;
+    }
+    setRightFolded(true);
+  };
 
   useEffect(() => {
     request<Metadata[]>(`${API}/operations`)
@@ -142,11 +175,11 @@ export function ViewWorkspace({
           sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", flex: "1 1 auto", minWidth: 0, minHeight: 0, overflow: "hidden" }}
           style={{
             gridTemplateRows: parametersFolded
-              ? "minmax(0, 1fr) 0px 32px"
-              : `${splitRatio * 100}% auto ${(1 - splitRatio) * 100}%`,
+              ? "minmax(0, 1fr) 4px 0px"
+              : `${splitRatio * 100}% 4px ${(1 - splitRatio) * 100}%`,
           }}
         >
-          <Box className="center-pane" sx={{ minWidth: 0, minHeight: 0, overflow: "hidden", position: "relative" }}>
+          <Box className="center-pane" sx={{ minWidth: 0, minHeight: 0, overflow: "hidden", position: "relative", background: "#151a1f" }}>
             <Preview
               project={project}
               view={view}
@@ -154,28 +187,25 @@ export function ViewWorkspace({
               activeEditing={activeEditing}
             />
           </Box>
-          {!parametersFolded && (
-            <ResizeHandle
-              axis="vertical"
-              onResize={(d) =>
-                setSplitRatio((r) =>
-                  Math.max(
-                    0.2,
-                    Math.min(
-                      0.8,
-                      r +
-                        d /
-                          Math.max(
-                            1,
-                            document.querySelector(".center")?.clientHeight ??
-                              1,
-                          ),
-                    ),
-                  ),
-                )
-              }
-            />
-          )}
+          <ResizeHandle
+            axis="vertical"
+            onResize={resizeParameters}
+          >
+            <Box
+              sx={{
+                position: "absolute",
+                inset: "-6px 0",
+                "&:hover .parameter-splitter-button": { opacity: 1 },
+              }}
+            >
+              <FoldButton
+                label={parametersFolded ? "Expand parameters" : "Collapse parameters"}
+                direction={parametersFolded ? "up" : "down"}
+                splitter
+                onClick={toggleParametersFold}
+              />
+            </Box>
+          </ResizeHandle>
           <Box
             className={`center-pane ${parametersFolded ? "folded-pane" : ""}`}
             sx={{
@@ -183,6 +213,8 @@ export function ViewWorkspace({
               minHeight: 0,
               overflow: parametersFolded ? "visible" : "hidden",
               position: "relative",
+              background: "#20272f",
+              boxShadow: "inset 0 1px #3b4651",
               ...(parametersFolded && {
                 display: "flex",
                 alignItems: "center",
@@ -190,21 +222,8 @@ export function ViewWorkspace({
               }),
             }}
           >
-            {parametersFolded ? (
-              <FoldButton
-                label="Expand parameters"
-                direction="up"
-                onClick={() => setParametersFolded(false)}
-              />
-            ) : (
+            {parametersFolded ? null : (
               <>
-                <Box className="pane-corner" sx={{ position: "absolute", top: 4, right: 4, zIndex: 2 }}>
-                  <FoldButton
-                    label="Collapse parameters"
-                    direction="down"
-                    onClick={() => setParametersFolded(true)}
-                  />
-                </Box>
                 <Parameters
                   meta={selectedMeta}
                   op={
@@ -227,38 +246,37 @@ export function ViewWorkspace({
           </Box>
         </Box>
       </Box>
-      {!rightFolded && (
-        <ResizeHandle
+      <ResizeHandle
           axis="horizontal"
-          onResize={(d) =>
-            setRightWidth((w) => Math.max(240, Math.min(500, w - d)))
-          }
-        />
-      )}
+          onResize={resizeRight}
+        >
+          <Box sx={{ position: "absolute", inset: "0 -6px", "&:hover .side-splitter-button": { opacity: 1 } }}>
+            <FoldButton
+              label={rightFolded ? "Expand pipeline sidebar" : "Collapse pipeline sidebar"}
+              direction={rightFolded ? "left" : "right"}
+              splitter
+              onClick={toggleRightFold}
+            />
+          </Box>
+        </ResizeHandle>
       <aside
         className={`right ${rightFolded ? "folded" : ""}`}
-        style={{ width: rightFolded ? 30 : rightWidth }}
+        style={{ width: rightFolded ? 0 : rightWidth, backgroundColor: "#20272f" }}
         sx={{
           display: "flex", flex: "0 0 auto", flexDirection: "column", minWidth: 0, minHeight: 0,
-          overflow: "hidden", background: "#191e24", borderLeft: "1px solid #303840",
-          ...(rightFolded && { width: "30px !important", "& .pane-heading": { justifyContent: "center", p: "8px 0" }, "& .fold-button": { width: 30, height: 36, p: "4px 0" } }),
+          overflow: "hidden", background: "#20272f", borderLeft: "1px solid #46515c",
+          boxShadow: "-1px 0 0 rgba(255, 255, 255, 0.04)",
+          ...(rightFolded && {
+            width: "0 !important",
+            border: 0,
+            boxShadow: "none",
+          }),
         }}
       >
-        <Box className="pane-heading" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 56, p: "8px 12px" }}>
-          {rightFolded ? (
-            <FoldButton
-              label="Expand pipeline sidebar"
-              direction="left"
-              onClick={() => setRightFolded(false)}
-            />
-          ) : (
+        <Box className="pane-heading" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 56, p: "8px 12px", background: "#252d36", borderBottom: "1px solid #3b4651" }}>
+          {rightFolded ? null : (
             <>
               <Typography className="section-title" sx={{ fontWeight: 700 }}>Pipeline</Typography>
-              <FoldButton
-                label="Collapse pipeline sidebar"
-                direction="right"
-                onClick={() => setRightFolded(true)}
-              />
             </>
           )}
         </Box>
@@ -271,7 +289,7 @@ export function ViewWorkspace({
               disabled={!view || saving}
               onClick={save}
               className="save-pipeline"
-              sx={{ m: "0 12px 12px", width: "calc(100% - 24px)" }}
+              sx={{ m: "12px 12px 12px", width: "calc(100% - 24px)" }}
             >
               {saving ? "Saving…" : "Save pipeline"}
             </Button>
