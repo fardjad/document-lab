@@ -1,6 +1,9 @@
+import re
+
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 try:
@@ -154,8 +157,10 @@ def create_app(
         return list_projects.list()
 
     @application.post("/api/projects", status_code=201)
-    def create_project_endpoint(project_id: str, image: UploadFile) -> dict:
+    def create_project_endpoint(image: UploadFile) -> dict:
         data = image.file.read()
+        filename = image.filename or "project"
+        project_id = Path(filename).stem
         try:
             created = create_project.create(project_id, ProjectImage.from_png(data))
         except ValueError as error:
@@ -180,10 +185,6 @@ def create_app(
         except ProjectNotFound as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         return Response(status_code=204)
-
-    @application.post("/api/projects/import", status_code=501)
-    def import_project_endpoint(image: UploadFile) -> dict:
-        raise HTTPException(status_code=501, detail="Project import is not available yet")
 
     @application.get("/api/projects/{project_id}/image")
     def project_image(project_id: str) -> Response:

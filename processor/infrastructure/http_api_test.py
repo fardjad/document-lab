@@ -10,7 +10,6 @@ from infrastructure.http_api import create_app
 from application.view.usecases.invoke_helper import InvokeHelper
 from application.project.usecases.create_project import CreateProject
 from application.project.usecases.delete_project import DeleteProject
-from application.project.usecases.import_project import ImportProject
 from application.project.usecases.list_projects import ListProjects
 from application.project.usecases.read_project_image import ReadProjectImage
 from application.project.usecases.read_project_image_size import ReadProjectImageSize
@@ -56,14 +55,14 @@ class HttpApiIntegrationTests(unittest.TestCase):
         sizes = ReadProjectImageSize(store)
         analyzer = OpenCVDocumentAnalyzer()
         registry = OperationRegistryImpl([RotateOperation(), StraightenOperation(analyzer), TrimOperation(analyzer), CropOperation(), RemoveBackgroundOperation(PassthroughRemover())])
-        self.client = TestClient(create_app(ListProjects(store), reader, ["http://test"], CreateProject(store, store), UpdateProject(store, store), DeleteProject(store, store), ImportProject(store, store), ListViews(store), CreateView(store), UpdateView(store, registry), DeleteView(store), RenderView(store, reader, sizes, registry), InvokeHelper(store, reader, sizes, registry)))
+        self.client = TestClient(create_app(ListProjects(store), reader, ["http://test"], CreateProject(store, store), UpdateProject(store, store), DeleteProject(store, store), ListViews(store), CreateView(store), UpdateView(store, registry), DeleteView(store), RenderView(store, reader, sizes, registry), InvokeHelper(store, reader, sizes, registry)))
 
     def test_project_lifecycle_end_to_end(self) -> None:
-        created = self.client.post("/api/projects", params={"project_id": "scan"}, files={"image": ("image.png", png(), "image/png")})
+        created = self.client.post("/api/projects", files={"image": ("scan.png", png(), "image/png")})
         self.assertEqual(201, created.status_code)
         self.assertEqual(["scan"], self.client.get("/api/projects").json())
         self.assertEqual(png(), self.client.get("/api/projects/scan/image").content)
-        duplicate = self.client.post("/api/projects", params={"project_id": "scan"}, files={"image": ("image.png", png(), "image/png")})
+        duplicate = self.client.post("/api/projects", files={"image": ("scan.png", png(), "image/png")})
         self.assertEqual(422, duplicate.status_code)
         replaced = self.client.put("/api/projects/scan", files={"image": ("image.png", png(), "image/png")})
         self.assertEqual(204, replaced.status_code)
@@ -74,15 +73,11 @@ class HttpApiIntegrationTests(unittest.TestCase):
         self.assertEqual([], self.client.get("/api/projects").json())
         self.assertEqual(404, self.client.delete("/api/projects/scan").status_code)
 
-    def test_import_stub_is_501(self) -> None:
-        response = self.client.post("/api/projects/import", files={"image": ("image.png", png(), "image/png")})
-        self.assertEqual(501, response.status_code)
-
     def test_project_path_traversal_is_404(self) -> None:
         self.assertEqual(404, self.client.get("/api/projects/..%2Foutside/views").status_code)
 
     def test_view_crud_with_pipeline_round_trip(self) -> None:
-        self.client.post("/api/projects", params={"project_id": "scan"}, files={"image": ("image.png", png(), "image/png")})
+        self.client.post("/api/projects", files={"image": ("scan.png", png(), "image/png")})
         view = self.client.post("/api/projects/scan/views", json={"name": "Card"}).json()
         self.assertEqual(1, view["id"])
         self.assertEqual(PIPELINE, view["pipeline"])
@@ -100,7 +95,7 @@ class HttpApiIntegrationTests(unittest.TestCase):
         self.assertEqual([], self.client.get("/api/projects/scan/views").json())
 
     def test_render_download_and_preview_pipeline_override(self) -> None:
-        self.client.post("/api/projects", params={"project_id": "scan"}, files={"image": ("image.png", png(), "image/png")})
+        self.client.post("/api/projects", files={"image": ("scan.png", png(), "image/png")})
         self.client.post("/api/projects/scan/views", json={"name": "Card"})
         download = self.client.get("/api/projects/scan/views/1/render")
         self.assertEqual(200, download.status_code)
@@ -123,7 +118,7 @@ class HttpApiIntegrationTests(unittest.TestCase):
         source = source.rotate(6, fillcolor="white")
         output = BytesIO()
         source.save(output, "PNG")
-        self.client.post("/api/projects", params={"project_id": "scan"}, files={"image": ("image.png", output.getvalue(), "image/png")})
+        self.client.post("/api/projects", files={"image": ("scan.png", output.getvalue(), "image/png")})
         self.client.post("/api/projects/scan/views", json={"name": "Card"})
         straighten = self.client.post("/api/projects/scan/views/1/helpers/auto_straighten")
         self.assertEqual(200, straighten.status_code)
@@ -134,7 +129,7 @@ class HttpApiIntegrationTests(unittest.TestCase):
         self.assertEqual(404, self.client.post("/api/projects/scan/views/9/helpers/auto_trim").status_code)
 
     def test_non_png_upload_rejected(self) -> None:
-        response = self.client.post("/api/projects", params={"project_id": "scan"}, files={"image": ("image.jpg", b"\xff\xd8\xff\xe0", "image/jpeg")})
+        response = self.client.post("/api/projects", files={"image": ("scan.jpg", b"\xff\xd8\xff\xe0", "image/jpeg")})
         self.assertEqual(422, response.status_code)
         self.assertEqual([], self.client.get("/api/projects").json())
 

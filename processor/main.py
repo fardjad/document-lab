@@ -2,7 +2,6 @@ try:
     from .application.view.usecases.invoke_helper import InvokeHelper
     from .application.project.usecases.create_project import CreateProject
     from .application.project.usecases.delete_project import DeleteProject
-    from .application.project.usecases.import_project import ImportProject
     from .application.project.usecases.list_projects import ListProjects
     from .application.project.usecases.read_project_image import ReadProjectImage
     from .application.project.usecases.read_project_image_size import ReadProjectImageSize
@@ -28,7 +27,6 @@ except ImportError:
     from application.view.usecases.invoke_helper import InvokeHelper
     from application.project.usecases.create_project import CreateProject
     from application.project.usecases.delete_project import DeleteProject
-    from application.project.usecases.import_project import ImportProject
     from application.project.usecases.list_projects import ListProjects
     from application.project.usecases.read_project_image import ReadProjectImage
     from application.project.usecases.read_project_image_size import ReadProjectImageSize
@@ -78,7 +76,6 @@ app = create_app(
     CreateProject(store, store),
     UpdateProject(store, store),
     DeleteProject(store, store),
-    ImportProject(store, store),
     ListViews(store),
     CreateView(store),
     UpdateView(store, registry, cache),
