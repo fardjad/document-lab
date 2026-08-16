@@ -9,6 +9,8 @@ from typing import Any
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, Response
 from PIL import Image, ImageChops
+import cv2
+import numpy as np
 
 app = FastAPI(title="Core image extensions")
 
@@ -108,6 +110,30 @@ def _trim_bounds(image):
     return contents or (0, 0, image.width, image.height)
 
 
+def _straighten_angle(image):
+    pixels = np.asarray(image.convert("L"))
+    edges = cv2.Canny(pixels, 50, 150)
+    lines = cv2.HoughLinesP(
+        edges,
+        1,
+        np.pi / 180,
+        threshold=max(50, image.width // 8),
+        minLineLength=max(100, image.width // 5),
+        maxLineGap=20,
+    )
+    if lines is None:
+        return 0.0
+    angles = []
+    for x1, y1, x2, y2 in lines.reshape(-1, 4):
+        angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
+        if angle > 45:
+            angle -= 90
+        elif angle < -45:
+            angle += 90
+        angles.append(angle)
+    return round(-float(np.median(angles)), 1) if angles else 0.0
+
+
 def _operation(kind, data, options):
     image = _image(data)
     if kind == "crop":
@@ -174,6 +200,6 @@ async def invoke(kind: str, helper: str, invocation_options: str = Form(...), cu
         if kind == "trim":
             bbox = _trim_bounds(pil)
             x,y,r,b = bbox; result = {"top":y,"right":pil.width-r,"bottom":pil.height-b,"left":x}
-        else: result = current
+        else: result = {**current, "angle": _straighten_angle(pil)}
         return {"options": VALIDATORS[kind](result)}
     except Exception as exc: raise HTTPException(422, {"code":"helper_failed","message":str(exc)})
