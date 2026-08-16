@@ -10,6 +10,7 @@ The processor owns projects, views, pipelines, persistence, rendering order, and
 
 - [Architecture](docs/ARCHITECTURE.md) explains the client, processor, domain, application, infrastructure, and extension boundaries.
 - [Plugin authoring](docs/PLUGIN_AUTHORING.md) is the complete v1 HTTP catalog, schema, render, and helper contract, including tests and deployment.
+- The processor publishes its API reference automatically at [`/docs`](http://localhost:8000/docs) and the OpenAPI document at [`/openapi.json`](http://localhost:8000/openapi.json) while it is running.
 - [Contributing](CONTRIBUTING.md) covers local development, checks, and change conventions.
 
 ## Quick start
@@ -65,9 +66,9 @@ The frontend listens on port `3000` by default and proxies `/api` requests to po
 1. Choose **Import** in the Projects panel and select a PNG image.
 2. Select the imported project and create a named view.
 3. Use **Add operation** to add an operation discovered from the extension registry.
-4. Select an operation to edit its schema-defined parameters. Reorder operations, disable an operation temporarily, or remove it.
-5. Use an operation helper, such as auto-trim, when one is available. A helper updates the operation in the working pipeline; it does not save the view by itself.
-6. Preview the working pipeline, then choose **Save pipeline** to persist it. Downloading a view renders the saved pipeline as a PNG.
+4. Select an operation to edit its schema-defined options. Reorder operations, disable an operation temporarily, or remove it.
+5. Use an operation helper, such as auto-trim, when one is available. A helper updates the operation options draft; save or cancel the suggestion from the options pane.
+6. Preview edits before saving them. Downloading a view renders the saved pipeline as a PNG.
 
 A project keeps its source PNG and view metadata under the configured project root. A view is a name plus an ordered pipeline. Crop is an ordinary pipeline operation with normalized rectangle options; trim is a separate operation with integer edge-pixel options. An empty pipeline is an identity transform. Disabled operations are retained in the view but skipped during rendering.
 
@@ -90,37 +91,6 @@ A helper belongs to one operation. It receives the image at that operation's pip
 At startup, the processor reads the YAML registry selected by `EXTENSIONS_REGISTRY_PATH`. It health-checks each source, fetches its catalog and selected schemas, validates them, and builds the active operation registry. `allow_operations` can restrict a source to named kinds. `POST /api/operations/reload` repeats discovery and replaces the registry only after the new set is valid. When no registry path is configured, the processor can use its local extension fallback; the normal development stack uses HTTP discovery.
 
 The repository's core service currently publishes `crop`, `rotate`, `straighten`, `trim`, and `remove_background`, with `auto_straighten` and `auto_trim` helpers. Other services can publish additional operation kinds without importing their code into the processor.
-
-## Processor API overview
-
-The processor is served at port `8000` in development. Successful image responses use `image/png`; JSON errors use the framework's error envelope and a `422` status for invalid input or render failures.
-
-### Operation discovery
-
-- `GET /api/operations` returns a JSON array. Each item contains `kind`, `name`, `description`, `icon`, `default_options`, the operation `schema`, and a `helpers` array. Each helper contains `name`, `display_name`, `description`, and its invocation `schema`.
-- `POST /api/operations/reload` reloads the configured extension registry and returns `{ "kinds": [...] }`. It returns `501` when HTTP discovery is not configured and `422` when discovery fails.
-
-### Projects
-
-- `GET /api/projects` returns project identifiers.
-- `GET /api/projects/details` returns `{ "id", "name" }` records.
-- `POST /api/projects` accepts a multipart `image` upload and returns `201` with `{ "id": "..." }`.
-- `PUT /api/projects/{project_id}/name` accepts `{ "name": "..." }` and returns the updated identifier and display name.
-- `PUT /api/projects/{project_id}` replaces the source with a multipart `image` upload and returns `204`.
-- `GET /api/projects/{project_id}/image` returns the source PNG.
-- `DELETE /api/projects/{project_id}` returns `204`.
-
-### Views and rendering
-
-- `GET /api/projects/{project_id}/views` lists views. Each view contains `id`, `name`, and `pipeline`.
-- `POST /api/projects/{project_id}/views` accepts `{ "name": "...", "pipeline": [...] }`, with `pipeline` optional, and returns `201` with the created view.
-- `PUT /api/projects/{project_id}/views/{view_id}` replaces the view name and complete pipeline.
-- `DELETE /api/projects/{project_id}/views/{view_id}` returns `204`.
-- `GET /api/projects/{project_id}/views/{view_id}/render` renders the saved pipeline and returns a downloadable PNG.
-- `POST /api/projects/{project_id}/views/{view_id}/render` accepts `{ "pipeline": [...] }` and previews that pipeline without persisting it.
-- `POST /api/projects/{project_id}/views/{view_id}/helpers/{helper_name}` accepts an optional JSON object and returns `{ "options": {...} }`.
-
-Unknown projects or views return `404`. Invalid identifiers, operation kinds, schemas, and image data return `422`.
 
 ## Repository shape
 
