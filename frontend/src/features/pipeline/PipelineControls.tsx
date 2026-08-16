@@ -150,7 +150,7 @@ export function Parameters({
                     setDraft({ ...draft, [key]: Number(e.target.value) });
                     onDraftChange({ ...draft, [key]: Number(e.target.value) });
                   }}
-                  inputProps={{ min: schema.min, max: schema.max, step }}
+                  slotProps={{ htmlInput: { min: schema.min, max: schema.max, step } }}
                 />
               </Box>
             );
@@ -166,7 +166,7 @@ export function Parameters({
                 setDraft({ ...draft, [key]: Number(e.target.value) });
                 onDraftChange({ ...draft, [key]: Number(e.target.value) });
               }}
-              inputProps={{ min: schema.min, max: schema.max, step }}
+              slotProps={{ htmlInput: { min: schema.min, max: schema.max, step } }}
               helperText={schema.description}
             />
           );

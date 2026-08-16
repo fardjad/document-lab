@@ -235,7 +235,7 @@ export function ProjectSidebar({
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         placeholder="Search projects"
-        inputProps={{ "aria-label": "Search projects" }}
+        slotProps={{ htmlInput: { "aria-label": "Search projects" } }}
         sx={{ px: 1, pb: 1 }}
       />
       <ProjectTree
