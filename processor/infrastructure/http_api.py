@@ -10,7 +10,6 @@ try:
     from application.view.usecases.invoke_helper import InvokeHelper
     from application.project.usecases.create_project import CreateProject
     from application.project.usecases.delete_project import DeleteProject
-    from application.project.usecases.import_project import ImportProject
     from application.project.usecases.list_projects import ListProjects
     from application.project.usecases.read_project_image import ReadProjectImage
     from application.project.usecases.update_project import UpdateProject
@@ -28,7 +27,6 @@ except ImportError:
     from ..application.view.usecases.invoke_helper import InvokeHelper
     from ..application.project.usecases.create_project import CreateProject
     from ..application.project.usecases.delete_project import DeleteProject
-    from ..application.project.usecases.import_project import ImportProject
     from ..application.project.usecases.list_projects import ListProjects
     from ..application.project.usecases.read_project_image import ReadProjectImage
     from ..application.project.usecases.update_project import UpdateProject
@@ -109,7 +107,6 @@ def create_app(
     create_project: CreateProject,
     update_project: UpdateProject,
     delete_project: DeleteProject,
-    import_project: ImportProject,
     list_views: ListViews,
     create_view: CreateView,
     update_view: UpdateView,
@@ -159,8 +156,9 @@ def create_app(
     @application.post("/api/projects", status_code=201)
     def create_project_endpoint(image: UploadFile) -> dict:
         data = image.file.read()
-        filename = image.filename or "project"
-        project_id = Path(filename).stem
+        project_id = Path(image.filename or "project").stem
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", project_id):
+            project_id = "project"
         try:
             created = create_project.create(project_id, ProjectImage.from_png(data))
         except ValueError as error:
