@@ -49,6 +49,7 @@ export function ProjectTree({
             ? `p:${selectedProject}`
             : `v:${selectedProject}:${selectedView}`
         }
+        expandedItems={selectedProject ? [`p:${selectedProject}`] : []}
       >
         {projects.map((p) => (
           <TreeItem
@@ -178,6 +179,10 @@ export function ProjectSidebar({
     view?: View;
   }>();
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const matchingProjects = projects.filter((project) =>
+    project.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
+  );
   const run = async (action: () => Promise<void>) => {
     try {
       await action();
@@ -224,8 +229,17 @@ export function ProjectSidebar({
           />
         </Button>
       </Box>
+      <TextField
+        size="small"
+        fullWidth
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Search projects"
+        inputProps={{ "aria-label": "Search projects" }}
+        sx={{ px: 1, pb: 1 }}
+      />
       <ProjectTree
-        projects={projects}
+        projects={matchingProjects}
         selectedProject={selectedProject}
         selectedView={selectedView}
         onProject={onProject}

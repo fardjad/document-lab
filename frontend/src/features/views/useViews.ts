@@ -26,12 +26,21 @@ export function useViews(
             project.id === projectId ? { ...project, views } : project,
           ),
         );
+        const requestedView = Number(new URLSearchParams(window.location.search).get("view"));
+        if (views.some((view) => view.id === requestedView)) {
+          setViewId(requestedView);
+        }
       })
       .catch((error) => setError(error.message));
   }, [projectId, setError, setProjects]);
 
   const selectView = (id: string, idToSelect: number) => {
     setViewId(idToSelect);
+    window.history.pushState(
+      {},
+      "",
+      `?project=${encodeURIComponent(id)}&view=${idToSelect}`,
+    );
   };
 
   const createView = async () => {
@@ -60,6 +69,11 @@ export function useViews(
         ),
       );
       setViewId(view.id);
+      window.history.pushState(
+        {},
+        "",
+        `?project=${encodeURIComponent(project.id)}&view=${view.id}`,
+      );
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
     }

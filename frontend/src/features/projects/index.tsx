@@ -16,8 +16,10 @@ export function useProjects(setError: (message: string) => void) {
           imageUrl: projectImageUrl(id),
         }));
         setProjects(loaded);
-        if (loaded[0]) {
-          setProjectId(loaded[0].id);
+        const requestedProject = new URLSearchParams(window.location.search).get("project");
+        const selected = loaded.find((project) => project.id === requestedProject) ?? loaded[0];
+        if (selected) {
+          setProjectId(selected.id);
         }
       })
       .catch((error) => setError(error.message));
@@ -25,6 +27,7 @@ export function useProjects(setError: (message: string) => void) {
 
   const selectProject = (id: string) => {
     setProjectId(id);
+    window.history.pushState({}, "", `?project=${encodeURIComponent(id)}`);
   };
 
   const upload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -50,6 +53,7 @@ export function useProjects(setError: (message: string) => void) {
       };
       setProjects((current) => [...current, project]);
       setProjectId(project.id);
+      window.history.pushState({}, "", `?project=${encodeURIComponent(project.id)}`);
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
     }
