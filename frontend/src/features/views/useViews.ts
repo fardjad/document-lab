@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { API, request } from "../../shared/api";
 import type { Project, View } from "../../entities";
@@ -102,7 +102,7 @@ export function useViews(
     );
   };
 
-  const updateView = async (project: Project, view: View, updated: View) => {
+  const updateView = useCallback(async (project: Project, view: View, updated: View) => {
     setProjects((current) =>
       current.map((item) =>
         item.id === project.id
@@ -115,7 +115,7 @@ export function useViews(
           : item,
       ),
     );
-  };
+  }, [setProjects]);
 
   const deleteView = async (project: Project, view: View) => {
     await request<void>(

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -13,7 +13,6 @@ import {
   Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import SaveIcon from "@mui/icons-material/Save";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { API, request } from "../../shared/api";
 import type {
@@ -43,7 +42,6 @@ export function ViewWorkspace({
   updateView: (project: Project, view: View, updated: View) => Promise<void>;
 }) {
   const [metas, setMetas] = useState<Metadata[]>([]);
-  const [saving, setSaving] = useState(false);
   const [helper, setHelper] = useState<{ index: number; value: Helper } | null>(
     null,
   );
@@ -53,6 +51,7 @@ export function ViewWorkspace({
   const [splitRatio, setSplitRatio] = useState(0.68);
   const [rightFolded, setRightFolded] = useState(false);
   const [parametersFolded, setParametersFolded] = useState(false);
+  const [parameterDraft, setParameterDraft] = useState<Options>();
   const {
     pipeline,
     setPipeline,
@@ -69,6 +68,34 @@ export function ViewWorkspace({
     selectedOperation === null
       ? undefined
       : opMeta(metas, pipeline[selectedOperation]?.kind);
+  const previewPipeline = useMemo(
+    () =>
+      selectedOperation === null || !parameterDraft
+        ? pipeline
+        : pipeline.map((operation, index) =>
+            index === selectedOperation
+              ? { ...operation, options: parameterDraft }
+              : operation,
+          ),
+    [pipeline, selectedOperation, parameterDraft],
+  );
+  const updateParameterDraft = useCallback((options?: Options) => {
+    setParameterDraft(options);
+  }, []);
+  const persistedPipeline = useMemo(
+    () =>
+      pipeline.map(({ kind, options, enabled }) =>
+        enabled === false ? { kind, options, enabled } : { kind, options },
+      ),
+    [pipeline],
+  );
+  const storedPipeline = useMemo(
+    () =>
+      (view?.pipeline ?? []).map(({ kind, options, enabled }) =>
+        enabled === false ? { kind, options, enabled } : { kind, options },
+      ),
+    [view?.pipeline],
+  );
   const resizeParameters = (delta: number) => {
     if (parametersFolded && delta >= 0) return;
     const height = Math.max(1, document.querySelector(".center")?.clientHeight ?? 1);
@@ -105,29 +132,57 @@ export function ViewWorkspace({
 
   useEffect(() => {
     request<Metadata[]>(`${API}/operations`)
-      .then(setMetas)
+      .then((operations) =>
+        setMetas(
+          operations.map((operation) => ({
+            ...operation,
+            schema: Object.fromEntries(
+              Object.entries(operation.schema).map(([name, schema]) => [
+                name,
+                {
+                  ...schema,
+                  label: schema.label ?? schema.title,
+                  control: schema.control ?? schema["x-hint-ui-control"],
+                  min: schema.min ?? schema.minimum,
+                  max: schema.max ?? schema.maximum,
+                  step: schema.step ?? schema["x-hint-ui-step"],
+                },
+              ]),
+            ),
+          })),
+        ),
+      )
       .catch((e) => setError(e.message));
   }, [setError]);
-  const save = async () => {
+  useEffect(() => {
     if (!project || !view) return;
-    setSaving(true);
-    try {
-      const updated = await request<View>(
+    if (JSON.stringify(persistedPipeline) === JSON.stringify(storedPipeline)) return;
+
+    setActiveEditing(true);
+    const timer = window.setTimeout(() => {
+      request<View>(
         `${API}/projects/${encodeURIComponent(project.id)}/views/${view.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: view.name, pipeline }),
+          body: JSON.stringify({ name: view.name, pipeline: persistedPipeline }),
         },
-      );
-      await updateView(project, view, updated);
-      setActiveEditing(false);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  };
+      )
+        .then((updated) => updateView(project, view, updated))
+        .then(() => setActiveEditing(false))
+        .catch((e) => setError(e.message));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [
+    project?.id,
+    view?.id,
+    view?.name,
+    persistedPipeline,
+    storedPipeline,
+    updateView,
+    setActiveEditing,
+    setError,
+  ]);
   const helperRun = async (
     selectedHelper = helper,
     options = helperOptions,
@@ -148,17 +203,8 @@ export function ViewWorkspace({
         },
       );
       const updatedOptions = r.options ?? r.suggestion;
-      if (updatedOptions) {
-        setPipeline((p) =>
-          p.map((o, i) =>
-            i === selectedHelper.index
-              ? { ...o, options: { ...o.options, ...updatedOptions } }
-              : o,
-          ),
-        );
-        setActiveEditing(true);
-      }
       setHelper(null);
+      return updatedOptions;
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -186,8 +232,8 @@ export function ViewWorkspace({
             <Preview
               project={project}
               view={view}
-              pipeline={pipeline}
-              activeEditing={activeEditing}
+              pipeline={previewPipeline}
+              activeEditing={activeEditing || Boolean(parameterDraft)}
             />
           </Box>
           <ResizeHandle
@@ -243,6 +289,20 @@ export function ViewWorkspace({
                     );
                     setActiveEditing(true);
                   }}
+                  onHelper={async (selectedHelper) => {
+                    if (selectedOperation === null || !selectedMeta) return;
+                    if (Object.keys(selectedHelper.schema ?? {}).length) {
+                      setHelper({ index: selectedOperation, value: selectedHelper });
+                      setHelperOptions({});
+                      return;
+                    } else {
+                      return helperRun(
+                        { index: selectedOperation, value: selectedHelper },
+                        {},
+                      );
+                    }
+                  }}
+                  onDraftChange={updateParameterDraft}
                 />
               </>
             )}
@@ -285,17 +345,6 @@ export function ViewWorkspace({
         </Box>
         {!rightFolded && (
           <>
-            <Button
-              fullWidth
-              variant="contained"
-              startIcon={<SaveIcon />}
-              disabled={!view || saving}
-              onClick={save}
-              className="save-pipeline"
-              sx={{ m: "12px 12px 12px", width: "calc(100% - 24px)" }}
-            >
-              {saving ? "Saving…" : "Save pipeline"}
-            </Button>
             <Pipeline
               pipeline={pipeline}
               metas={metas}
@@ -305,14 +354,6 @@ export function ViewWorkspace({
               onAdd={add}
               onRemove={remove}
               onMove={move}
-              onHelper={(i, h) => {
-                if (Object.keys(h.schema ?? {}).length) {
-                  setHelper({ index: i, value: h });
-                  setHelperOptions({});
-                } else {
-                  void helperRun({ index: i, value: h }, {});
-                }
-              }}
             />
           </>
         )}

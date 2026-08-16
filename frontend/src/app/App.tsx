@@ -103,6 +103,7 @@ export function App() {
             </Box>
         </ResizeHandle>
         <ViewWorkspace
+          key={`${project?.id ?? ""}:${view?.id ?? ""}`}
           project={project}
           view={view}
           error={error}

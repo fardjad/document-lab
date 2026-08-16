@@ -10,6 +10,11 @@ export type Schema = {
   step?: number;
   options?: unknown[];
   enum?: unknown[];
+  minimum?: number;
+  maximum?: number;
+  title?: string;
+  "x-hint-ui-control"?: string;
+  "x-hint-ui-step"?: number;
 };
 export type Helper = {
   name: string;

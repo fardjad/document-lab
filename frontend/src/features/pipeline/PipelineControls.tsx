@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -31,7 +31,7 @@ import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import CenterFocusStrongIcon from "@mui/icons-material/CenterFocusStrong";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 
-import type { Metadata, Options, PipelineOp, Helper } from "../../entities";
+import type { Helper, Metadata, Options, PipelineOp } from "../../entities";
 
 const icons: Record<string, React.ElementType> = {
   Rotate90DegreesCcw: Rotate90DegreesCcwIcon,
@@ -57,11 +57,21 @@ export function Parameters({
   meta,
   op,
   onChange,
+  onHelper,
+  onDraftChange,
 }: {
   meta?: Metadata;
   op?: PipelineOp;
   onChange: (o: Options) => void;
+  onHelper: (helper: Helper) => Promise<Options | undefined>;
+  onDraftChange: (options?: Options) => void;
 }) {
+  const [draft, setDraft] = useState<Options>({});
+  useEffect(() => {
+    setDraft(op?.options ?? {});
+    onDraftChange(undefined);
+  }, [op, onDraftChange]);
+  const hasChanges = JSON.stringify(draft) !== JSON.stringify(op?.options ?? {});
   if (!meta || !op)
     return (
       <Box sx={{ height: "100%", overflow: "auto", p: 2 }}>
@@ -77,7 +87,7 @@ export function Parameters({
       <Typography sx={{ display: "block", mb: 2 }}>{meta.description}</Typography>
       <Stack spacing={2}>
         {Object.entries(meta.schema ?? {}).map(([key, schema]) => {
-          const value = op.options[key] ?? meta.default_options[key] ?? "";
+          const value = draft[key] ?? meta.default_options[key] ?? "";
           const label = schema.label ?? key;
           const step = schema.step;
           if (schema.control === "checkbox")
@@ -87,9 +97,10 @@ export function Parameters({
                 control={
                   <Checkbox
                     checked={Boolean(value)}
-                    onChange={(e) =>
-                      onChange({ ...op.options, [key]: e.target.checked })
-                    }
+                    onChange={(e) => {
+                      setDraft({ ...draft, [key]: e.target.checked });
+                      onDraftChange({ ...draft, [key]: e.target.checked });
+                    }}
                   />
                 }
                 label={label}
@@ -102,9 +113,10 @@ export function Parameters({
                 <Select
                   value={String(value)}
                   label={label}
-                  onChange={(e) =>
-                    onChange({ ...op.options, [key]: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setDraft({ ...draft, [key]: e.target.value });
+                    onDraftChange({ ...draft, [key]: e.target.value });
+                  }}
                 >
                   {(schema.options ?? schema.enum ?? []).map((x) => (
                     <MenuItem key={String(x)} value={String(x)}>
@@ -125,15 +137,19 @@ export function Parameters({
                   min={schema.min}
                   max={schema.max}
                   step={step}
-                  onChange={(_, v) => onChange({ ...op.options, [key]: v })}
+                  onChange={(_, v) => {
+                    setDraft({ ...draft, [key]: v });
+                    onDraftChange({ ...draft, [key]: v });
+                  }}
                 />
                 <TextField
                   size="small"
                   type="number"
                   value={value}
-                  onChange={(e) =>
-                    onChange({ ...op.options, [key]: Number(e.target.value) })
-                  }
+                  onChange={(e) => {
+                    setDraft({ ...draft, [key]: Number(e.target.value) });
+                    onDraftChange({ ...draft, [key]: Number(e.target.value) });
+                  }}
                   inputProps={{ min: schema.min, max: schema.max, step }}
                 />
               </Box>
@@ -146,15 +162,61 @@ export function Parameters({
               type="number"
               label={label}
               value={value}
-              onChange={(e) =>
-                onChange({ ...op.options, [key]: Number(e.target.value) })
-              }
+              onChange={(e) => {
+                setDraft({ ...draft, [key]: Number(e.target.value) });
+                onDraftChange({ ...draft, [key]: Number(e.target.value) });
+              }}
               inputProps={{ min: schema.min, max: schema.max, step }}
               helperText={schema.description}
             />
           );
         })}
       </Stack>
+      <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+        <Button
+          variant="contained"
+          disabled={!hasChanges}
+          onClick={() => {
+            onChange(draft);
+            onDraftChange(undefined);
+          }}
+        >
+          Save
+        </Button>
+        <Button
+          disabled={!hasChanges}
+          onClick={() => {
+            setDraft(op.options);
+            onDraftChange(undefined);
+          }}
+        >
+          Cancel
+        </Button>
+      </Stack>
+      {meta.helpers?.length ? (
+        <Stack spacing={1} sx={{ mt: 3 }}>
+          <Typography variant="subtitle2">Actions</Typography>
+          {meta.helpers.map((helper) => (
+            <Button
+              key={helper.name}
+              fullWidth
+              variant="outlined"
+              startIcon={<AutoFixHighIcon />}
+              onClick={() => {
+                void onHelper(helper).then((options) => {
+                  if (options) setDraft((current) => {
+                    const next = { ...current, ...options };
+                    onDraftChange(next);
+                    return next;
+                  });
+                });
+              }}
+            >
+              {helper.display_name}
+            </Button>
+          ))}
+        </Stack>
+      ) : null}
     </Box>
   );
 }
@@ -167,7 +229,6 @@ export function Pipeline({
   onAdd,
   onRemove,
   onMove,
-  onHelper,
 }: {
   pipeline: PipelineOp[];
   metas: Metadata[];
@@ -177,7 +238,6 @@ export function Pipeline({
   onAdd: (kind: string) => void;
   onRemove: (i: number) => void;
   onMove: (i: number, d: number) => void;
-  onHelper: (i: number, h: Helper) => void;
 }) {
   const [adding, setAdding] = useState(false);
   return (
@@ -262,23 +322,6 @@ export function Pipeline({
                     <DeleteOutlineIcon />
                   </IconButton>
                 </Box>
-                {m?.helpers?.length ? (
-                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1 }}>
-                    {m.helpers.map((h) => (
-                      <Button
-                        key={h.name}
-                        size="small"
-                        startIcon={<AutoFixHighIcon />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onHelper(i, h);
-                        }}
-                      >
-                        {h.display_name}
-                      </Button>
-                    ))}
-                  </Box>
-                ) : null}
               </CardContent>
             </Card>
           );
