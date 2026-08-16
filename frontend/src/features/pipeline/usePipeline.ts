@@ -8,11 +8,16 @@ export function usePipeline(metas: Metadata[], view?: View) {
     null,
   );
   const [activeEditing, setActiveEditing] = useState(false);
+  const [pipelineReady, setPipelineReady] = useState(false);
   useEffect(() => {
-    if (!view) return;
+    if (!view) {
+      setPipelineReady(false);
+      return;
+    }
     setPipeline(clonePipeline(view.pipeline));
     setSelectedOperation(null);
     setActiveEditing(false);
+    setPipelineReady(true);
   }, [view?.id]);
   const add = (kind: string) => {
     const meta = opMeta(metas, kind);
@@ -58,6 +63,7 @@ export function usePipeline(metas: Metadata[], view?: View) {
     setSelectedOperation,
     activeEditing,
     setActiveEditing,
+    pipelineReady,
     add,
     remove,
     move,

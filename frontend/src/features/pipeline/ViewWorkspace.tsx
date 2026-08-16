@@ -59,6 +59,7 @@ export function ViewWorkspace({
     setSelectedOperation,
     activeEditing,
     setActiveEditing,
+    pipelineReady,
     add,
     remove,
     move,
@@ -155,7 +156,7 @@ export function ViewWorkspace({
       .catch((e) => setError(e.message));
   }, [setError]);
   useEffect(() => {
-    if (!project || !view) return;
+    if (!project || !view || !pipelineReady) return;
     if (JSON.stringify(persistedPipeline) === JSON.stringify(storedPipeline)) return;
 
     setActiveEditing(true);
@@ -182,6 +183,7 @@ export function ViewWorkspace({
     updateView,
     setActiveEditing,
     setError,
+    pipelineReady,
   ]);
   const helperRun = async (
     selectedHelper = helper,
