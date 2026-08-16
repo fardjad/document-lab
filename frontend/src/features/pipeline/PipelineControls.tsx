@@ -30,6 +30,8 @@ import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import CenterFocusStrongIcon from "@mui/icons-material/CenterFocusStrong";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
+import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
 
 import type { Helper, Metadata, Options, PipelineOp } from "../../entities";
 
@@ -75,15 +77,46 @@ export function Parameters({
   if (!meta || !op)
     return (
       <Box sx={{ height: "100%", overflow: "auto", p: 2 }}>
-        <Typography variant="h6">Operation parameters</Typography>
+        <Typography variant="h6">Operation options</Typography>
         <Typography color="text.secondary">
-          Select an operation in the pipeline to edit its parameters.
+          Select an operation in the pipeline to edit its options.
         </Typography>
       </Box>
     );
   return (
     <Box sx={{ height: "100%", overflow: "auto", p: 2 }}>
-      <Typography variant="h6">{meta.name} parameters</Typography>
+      <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+        <Typography variant="h6" sx={{ flex: 1 }}>{meta.name} options</Typography>
+        <Tooltip title="Save options">
+          <span>
+            <IconButton
+              size="small"
+              color="primary"
+              disabled={!hasChanges}
+              onClick={() => {
+                onChange(draft);
+                onDraftChange(undefined);
+              }}
+            >
+              <CheckIcon />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="Cancel changes">
+          <span>
+            <IconButton
+              size="small"
+              disabled={!hasChanges}
+              onClick={() => {
+                setDraft(op.options);
+                onDraftChange(undefined);
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </span>
+        </Tooltip>
+      </Box>
       <Typography sx={{ display: "block", mb: 2 }}>{meta.description}</Typography>
       <Stack spacing={2}>
         {Object.entries(meta.schema ?? {}).map(([key, schema]) => {
@@ -172,30 +205,9 @@ export function Parameters({
           );
         })}
       </Stack>
-      <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-        <Button
-          variant="contained"
-          disabled={!hasChanges}
-          onClick={() => {
-            onChange(draft);
-            onDraftChange(undefined);
-          }}
-        >
-          Save
-        </Button>
-        <Button
-          disabled={!hasChanges}
-          onClick={() => {
-            setDraft(op.options);
-            onDraftChange(undefined);
-          }}
-        >
-          Cancel
-        </Button>
-      </Stack>
       {meta.helpers?.length ? (
         <Stack spacing={1} sx={{ mt: 3 }}>
-          <Typography variant="subtitle2">Actions</Typography>
+          <Typography variant="subtitle2">Helpers</Typography>
           {meta.helpers.map((helper) => (
             <Button
               key={helper.name}
@@ -242,8 +254,7 @@ export function Pipeline({
   const [adding, setAdding] = useState(false);
   return (
     <Box sx={{ minHeight: 0, overflow: "auto", p: "0 8px 12px", flex: "1 1 auto" }}>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
-        <Typography variant="h6">Pipeline</Typography>
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5 }}>
         <Typography variant="caption">{pipeline.length} operations</Typography>
       </Box>
       <Stack spacing={1}>
@@ -294,6 +305,7 @@ export function Pipeline({
                   </Box>
                   <IconButton
                     size="small"
+                    sx={{ ml: "auto" }}
                     onClick={(e) => {
                       e.stopPropagation();
                       onMove(i, -1);

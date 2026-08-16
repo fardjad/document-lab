@@ -29,6 +29,8 @@ export function useViews(
         const requestedView = Number(new URLSearchParams(window.location.search).get("view"));
         if (views.some((view) => view.id === requestedView)) {
           setViewId(requestedView);
+        } else if (new URLSearchParams(window.location.search).has("view")) {
+          window.history.replaceState({}, "", window.location.pathname);
         }
       })
       .catch((error) => setError(error.message));

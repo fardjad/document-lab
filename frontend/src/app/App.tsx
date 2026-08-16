@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Box, ThemeProvider, Typography, createTheme } from "@mui/material";
+import { Backdrop, Box, CircularProgress, ThemeProvider, Typography, createTheme } from "@mui/material";
 import { ProjectSidebar, useProjects } from "../features/projects";
 import { useViews } from "../features/views";
 import { ViewWorkspace } from "../features/pipeline/ViewWorkspace";
 import { FoldButton, ResizeHandle } from "../shared/ui";
+import { useRequestsInFlight } from "../shared/api";
 
 export function App() {
+  const requestsInFlight = useRequestsInFlight();
   const [error, setError] = useState("");
   const [leftWidth, setLeftWidth] = useState(250);
   const [leftFolded, setLeftFolded] = useState(false);
@@ -47,6 +49,9 @@ export function App() {
   return (
     <ThemeProvider theme={theme}>
       <Box className="app" sx={{ display: "flex", flexDirection: "row", width: "100%", height: "100%", minWidth: 0 }}>
+        <Backdrop open={requestsInFlight > 0} sx={{ color: "primary.main", zIndex: (theme) => theme.zIndex.modal + 1 }}>
+          <CircularProgress color="inherit" aria-label="Loading" />
+        </Backdrop>
         <aside
           className={`left ${leftFolded ? "folded" : ""}`}
           style={{ width: leftFolded ? 0 : leftWidth, backgroundColor: "#20272f" }}

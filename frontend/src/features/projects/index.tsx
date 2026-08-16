@@ -17,7 +17,10 @@ export function useProjects(setError: (message: string) => void) {
         }));
         setProjects(loaded);
         const requestedProject = new URLSearchParams(window.location.search).get("project");
-        const selected = loaded.find((project) => project.id === requestedProject) ?? loaded[0];
+        const selected = loaded.find((project) => project.id === requestedProject);
+        if (requestedProject && !selected) {
+          window.history.replaceState({}, "", window.location.pathname);
+        }
         if (selected) {
           setProjectId(selected.id);
         }

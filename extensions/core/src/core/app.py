@@ -79,7 +79,14 @@ SCHEMAS = {
  "rotate": _schema("Rotate", {"degrees": _num("degrees", "Degrees", 0, 0, 270, 90, "integer")}, ["degrees"], x_hint_icon="Rotate90DegreesCcw"),
  "straighten": _schema("Straighten", {"angle": _num("angle", "Angle", 0, -45, 45, .1)}, ["angle"], x_hint_icon="Straighten"),
  "trim": _schema("Trim", {k: _num(k, k.title(), 0, 0, None, 1, "integer") for k in ("top","right","bottom","left")}, ["top","right","bottom","left"], x_hint_icon="ContentCut"),
- "remove_background": _schema("Remove Background", {"model": {"type":"string","enum":MODELS,"default":"birefnet-general"}, "alpha_matting":{"type":"boolean","default":False}, "alpha_matting_foreground_threshold":{"type":"integer","minimum":0,"maximum":255,"default":128}, "alpha_matting_background_threshold":{"type":"integer","minimum":0,"maximum":255,"default":128}, "alpha_matting_erode_size":{"type":"integer","minimum":1,"maximum":100,"default":10}, "post_process_mask":{"type":"boolean","default":False}}, ["model","alpha_matting","alpha_matting_foreground_threshold","alpha_matting_background_threshold","alpha_matting_erode_size","post_process_mask"], x_hint_icon="AutoFixHigh"),
+ "remove_background": _schema("Remove Background", {
+     "model": {"type":"string", "title":"Model", "enum":MODELS, "default":"birefnet-general", "x-hint-ui-control":"dropdown"},
+     "alpha_matting": {"type":"boolean", "title":"Alpha matting", "default":False, "x-hint-ui-control":"checkbox"},
+     "alpha_matting_foreground_threshold": _num("alpha_matting_foreground_threshold", "Alpha matting foreground threshold", 128, 0, 255, 1, "integer"),
+     "alpha_matting_background_threshold": _num("alpha_matting_background_threshold", "Alpha matting background threshold", 128, 0, 255, 1, "integer"),
+     "alpha_matting_erode_size": _num("alpha_matting_erode_size", "Alpha matting erode size", 10, 1, 100, 1, "integer"),
+     "post_process_mask": {"type":"boolean", "title":"Post-process mask", "default":False, "x-hint-ui-control":"checkbox"},
+ }, ["model","alpha_matting","alpha_matting_foreground_threshold","alpha_matting_background_threshold","alpha_matting_erode_size","post_process_mask"], x_hint_icon="AutoFixHigh"),
 }
 # _schema's keyword spelling is intentionally normalized here for valid JSON metadata.
 for schema in SCHEMAS.values():

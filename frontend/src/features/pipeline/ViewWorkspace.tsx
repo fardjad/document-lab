@@ -42,6 +42,7 @@ export function ViewWorkspace({
   updateView: (project: Project, view: View, updated: View) => Promise<void>;
 }) {
   const [metas, setMetas] = useState<Metadata[]>([]);
+  const [operationsLoading, setOperationsLoading] = useState(true);
   const [helper, setHelper] = useState<{ index: number; value: Helper } | null>(
     null,
   );
@@ -153,7 +154,8 @@ export function ViewWorkspace({
           })),
         ),
       )
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e.message))
+      .finally(() => setOperationsLoading(false));
   }, [setError]);
   useEffect(() => {
     if (!project || !view || !pipelineReady) return;
@@ -250,7 +252,7 @@ export function ViewWorkspace({
               }}
             >
               <FoldButton
-                label={parametersFolded ? "Expand parameters" : "Collapse parameters"}
+                label={parametersFolded ? "Expand options" : "Collapse options"}
                 direction={parametersFolded ? "up" : "down"}
                 splitter
                 onClick={toggleParametersFold}
@@ -347,16 +349,29 @@ export function ViewWorkspace({
         </Box>
         {!rightFolded && (
           <>
-            <Pipeline
-              pipeline={pipeline}
-              metas={metas}
-              selected={selectedOperation}
-              onSelect={setSelectedOperation}
-              onChange={change}
-              onAdd={add}
-              onRemove={remove}
-              onMove={move}
-            />
+            {operationsLoading ? (
+              <Box
+                sx={{
+                  flex: "1 1 auto",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <CircularProgress size={28} aria-label="Loading operations" />
+              </Box>
+            ) : (
+              <Pipeline
+                pipeline={pipeline}
+                metas={metas}
+                selected={selectedOperation}
+                onSelect={setSelectedOperation}
+                onChange={change}
+                onAdd={add}
+                onRemove={remove}
+                onMove={move}
+              />
+            )}
           </>
         )}
       </aside>

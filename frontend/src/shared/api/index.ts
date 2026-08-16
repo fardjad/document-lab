@@ -35,8 +35,34 @@ export type Project = {
 
 export const API = "/api";
 
+let requestsInFlight = 0;
+const requestListeners = new Set<() => void>();
+const notifyRequestListeners = () => requestListeners.forEach((listener) => listener());
+
+export function useRequestsInFlight() {
+  return useSyncExternalStore(
+    (listener) => {
+      requestListeners.add(listener);
+      return () => requestListeners.delete(listener);
+    },
+    () => requestsInFlight,
+    () => 0,
+  );
+}
+
+export async function trackedFetch(input: RequestInfo | URL, init?: RequestInit) {
+  requestsInFlight += 1;
+  notifyRequestListeners();
+  try {
+    return await fetch(input, init);
+  } finally {
+    requestsInFlight -= 1;
+    notifyRequestListeners();
+  }
+}
+
 export async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
+  const response = await trackedFetch(url, init);
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
   return response.status === 204 ? (undefined as T) : response.json();
 }
@@ -50,7 +76,7 @@ export async function renderView(
   viewId: number,
   pipeline?: PipelineOp[],
 ): Promise<Blob> {
-  const response = await fetch(
+  const response = await trackedFetch(
     `${API}/projects/${encodeURIComponent(projectId)}/views/${viewId}/render`,
     pipeline
       ? {
@@ -70,3 +96,4 @@ export async function downloadView(
 ): Promise<Blob> {
   return renderView(projectId, viewId);
 }
+import { useSyncExternalStore } from "react";

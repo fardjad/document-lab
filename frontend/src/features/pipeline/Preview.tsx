@@ -10,7 +10,7 @@ import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import CenterFocusStrongIcon from "@mui/icons-material/CenterFocusStrong";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
-import { API } from "../../shared/api";
+import { API, trackedFetch } from "../../shared/api";
 import type { PipelineOp, Project, View } from "../../entities";
 
 export function Preview({
@@ -55,7 +55,7 @@ export function Preview({
         setPreview("");
         return;
       }
-      fetch(
+      trackedFetch(
         `${API}/projects/${encodeURIComponent(project.id)}/views/${view.id}/render`,
         {
           method: "POST",
@@ -148,7 +148,7 @@ export function Preview({
   };
   const download = async () => {
     if (!project || !view) return;
-    const response = await fetch(
+    const response = await trackedFetch(
       `${API}/projects/${encodeURIComponent(project.id)}/views/${view.id}/render`,
     );
     if (!response.ok) throw new Error(`Download failed (${response.status})`);
