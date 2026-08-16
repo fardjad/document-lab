@@ -156,12 +156,15 @@ export function Preview({
         className="preview-toolbar"
         sx={{
           display: "flex",
-          flex: "0 0 48px",
+          flex: "0 0 56px",
+          minHeight: 56,
           alignItems: "center",
           justifyContent: "flex-end",
           gap: 0.5,
           width: "100%",
           p: "4px 8px",
+          background: "#20272f",
+          borderBottom: "1px solid #3b4651",
         }}
       >
         <Tooltip title="Fit and center">
