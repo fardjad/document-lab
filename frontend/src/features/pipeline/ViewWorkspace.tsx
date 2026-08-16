@@ -128,28 +128,31 @@ export function ViewWorkspace({
       setSaving(false);
     }
   };
-  const helperRun = async () => {
-    if (!project || !view || !helper) return;
+  const helperRun = async (
+    selectedHelper = helper,
+    options = helperOptions,
+  ) => {
+    if (!project || !view || !selectedHelper) return;
     setLoading(true);
     try {
       const r = await request<{ options?: Options; suggestion?: Options }>(
-        `${API}/projects/${encodeURIComponent(project.id)}/views/${view.id}/helpers/${helper.value.name}`,
+        `${API}/projects/${encodeURIComponent(project.id)}/views/${view.id}/pipeline/${selectedHelper.index}/helpers/${selectedHelper.value.name}`,
         {
           method: "POST",
-          headers: Object.keys(helperOptions).length
+          headers: Object.keys(options).length
             ? { "Content-Type": "application/json" }
             : undefined,
-          body: Object.keys(helperOptions).length
-            ? JSON.stringify(helperOptions)
+          body: Object.keys(options).length
+            ? JSON.stringify(options)
             : undefined,
         },
       );
-      const options = r.options ?? r.suggestion;
-      if (options) {
+      const updatedOptions = r.options ?? r.suggestion;
+      if (updatedOptions) {
         setPipeline((p) =>
           p.map((o, i) =>
-            i === helper.index
-              ? { ...o, options: { ...o.options, ...options } }
+            i === selectedHelper.index
+              ? { ...o, options: { ...o.options, ...updatedOptions } }
               : o,
           ),
         );
@@ -307,9 +310,7 @@ export function ViewWorkspace({
                   setHelper({ index: i, value: h });
                   setHelperOptions({});
                 } else {
-                  setHelper({ index: i, value: h });
-                  setHelperOptions({});
-                  setTimeout(helperRun, 0);
+                  void helperRun({ index: i, value: h }, {});
                 }
               }}
             />
@@ -347,7 +348,7 @@ export function ViewWorkspace({
             Cancel
           </Button>
           <Button
-            onClick={helperRun}
+            onClick={() => void helperRun()}
             variant="contained"
             startIcon={
               loading ? <CircularProgress size={16} /> : <PlayArrowIcon />

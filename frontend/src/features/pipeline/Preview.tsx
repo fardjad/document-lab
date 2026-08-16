@@ -74,10 +74,14 @@ export function Preview({
     setZoom(1);
     setPan({ x: 0, y: 0 });
   }, [project?.id, view?.id]);
+  const savedRenderUrl =
+    project && view
+      ? `${API}/projects/${encodeURIComponent(project.id)}/views/${view.id}/render?pipeline=${encodeURIComponent(JSON.stringify(view.pipeline))}`
+      : undefined;
   const src = activeEditing
     ? preview || project?.imageUrl
     : project && view
-      ? `${API}/projects/${encodeURIComponent(project.id)}/views/${view.id}/render`
+      ? savedRenderUrl
       : undefined;
   const reset = (nextZoom?: number) => {
     const viewer = imageViewer.current;

@@ -1,5 +1,5 @@
 [project]
-name = "document-cropper-processor"
+name = "document-cropper-core-extensions"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
@@ -8,19 +8,14 @@ dependencies = [
     "opencv-python-headless>=5.0.0.93",
     "pillow>=12.3.0",
     "pyyaml>=6.0.3",
-    "jsonschema>=4.23,<5",
     "rembg[cpu]>=2.0.60",
 ]
 
-[tool.pytest.ini_options]
-pythonpath = [".", "..", "../extensions/core/src"]
-testpaths = ["."]
+[dependency-groups]
+dev = ["pytest>=9.1.1"]
 
 [tool.fastapi]
-entrypoint = "main:app"
+entrypoint = "src.core.app:app"
 
-[dependency-groups]
-dev = [
-    "httpx2>=2.0.0",
-    "pytest>=9.1.1",
-]
+[tool.pytest.ini_options]
+pythonpath = ["src"]

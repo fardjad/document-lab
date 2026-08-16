@@ -28,8 +28,9 @@ class FakeSizes:
 class FakeOperation:
     kind = "trim"
 
-    def __init__(self, helper):
+    def __init__(self, helper, default_options=None):
         self.helpers = (helper,)
+        self.spec = OperationSpec(self.kind, {}, lambda options: options, default_options=default_options or {})
         self.rendered = []
 
     def render(self, rendered, options):
@@ -70,6 +71,15 @@ class InvokeHelperTests(unittest.TestCase):
         self.assertEqual(b"source_rendered", calls[0][0].image)
         self.assertEqual({"threshold": 3}, calls[0][1])
         self.assertEqual({"left": 2}, calls[0][2])
+
+    def test_rejects_helpers_that_do_not_belong_to_an_existing_pipeline_operation(self):
+        helper = Helper("auto_trim", OperationSpec("auto_trim", {}, lambda options: options), lambda rendered, invocation, current: current)
+        usecase = InvokeHelper(FakeStore(), FakeReader(), FakeSizes(), FakeRegistry(FakeOperation(helper)))
+
+        with self.assertRaisesRegex(ValueError, "Operation index out of range"):
+            usecase.invoke("project", 1, 2, "auto_trim", {})
+        with self.assertRaisesRegex(ValueError, "Unknown helper"):
+            usecase.invoke("project", 1, 0, "missing", {})
 
     def test_rejects_missing_helper_and_invalid_view_or_project(self):
         helper = Helper("other", OperationSpec("other", {}, lambda options: options), lambda rendered, invocation, current: current)

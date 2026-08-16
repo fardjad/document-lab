@@ -9,6 +9,7 @@ export type Schema = {
   max?: number;
   step?: number;
   options?: unknown[];
+  enum?: unknown[];
 };
 export type Helper = {
   name: string;

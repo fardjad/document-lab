@@ -17,6 +17,11 @@ class SettingsTests(unittest.TestCase):
             settings = Settings.from_environment()
         self.assertEqual(Path.home().parent.resolve(), settings.project_root)
 
+    def test_extension_registry_path_override_expands_and_resolves(self) -> None:
+        with patch.dict(os.environ, {"EXTENSIONS_REGISTRY_PATH": "~/extensions.yaml"}, clear=True):
+            settings = Settings.from_environment()
+        self.assertEqual((Path.home() / "extensions.yaml").resolve(), settings.extensions_registry_path)
+
 
 if __name__ == "__main__":
     unittest.main()

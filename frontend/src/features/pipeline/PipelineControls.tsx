@@ -95,7 +95,7 @@ export function Parameters({
                 label={label}
               />
             );
-          if (schema.control === "dropdown")
+          if (schema.control === "dropdown" || schema.enum)
             return (
               <FormControl fullWidth size="small" key={key}>
                 <InputLabel>{label}</InputLabel>
@@ -106,7 +106,7 @@ export function Parameters({
                     onChange({ ...op.options, [key]: e.target.value })
                   }
                 >
-                  {(schema.options ?? []).map((x) => (
+                  {(schema.options ?? schema.enum ?? []).map((x) => (
                     <MenuItem key={String(x)} value={String(x)}>
                       {String(x)}
                     </MenuItem>

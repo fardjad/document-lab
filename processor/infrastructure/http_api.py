@@ -95,21 +95,6 @@ def _analysis_response(result) -> dict:
     return {"suggestion": suggestion, "confidence": result.confidence, "reason": result.reason}
 
 
-def _operation_index(usecase, project_id: str, view_id: int, helper_name: str) -> int:
-    view = usecase.views.read_project_views(project_id_or_not_found(project_id)).find_view(view_id)
-    if view is None:
-        raise ViewNotFound("View not found")
-    for index, operation in enumerate(view.pipeline.operations):
-        registered = usecase.registry.get(operation.kind)
-        if any(helper.name == helper_name for helper in registered.helpers):
-            return index
-    for kind in usecase.registry.kinds():
-        registered = usecase.registry.get(kind)
-        if any(helper.name == helper_name for helper in registered.helpers):
-            return len(view.pipeline.operations)
-    raise ValueError(f"Unknown helper: {helper_name}")
-
-
 def create_app(
     list_projects: ListProjects,
     read_project_image: ReadProjectImage,
@@ -125,6 +110,7 @@ def create_app(
     invoke_helper: InvokeHelper,
     registry=None,
     rename_project: RenameProject | None = None,
+    reload_extensions=None,
 ) -> FastAPI:
     application = FastAPI(title="Document Cropper Processor")
     application.add_middleware(
@@ -147,18 +133,28 @@ def create_app(
                 "description": spec.description,
                 "icon": spec.icon,
                 "default_options": dict(spec.default_options),
-                "schema": spec.schema,
+                "schema": spec.schema.get("properties", {}),
                 "helpers": [
                     {
                         "name": helper.name,
                         "display_name": helper.display_name,
                         "description": helper.description,
-                        "schema": helper.invocation_spec.schema,
+                        "schema": helper.invocation_spec.schema.get("properties", {}),
                     }
                     for helper in registry.get(kind).helpers
                 ],
             })
         return result
+
+    @application.post("/api/operations/reload")
+    def reload_operations() -> dict:
+        if registry is None or reload_extensions is None:
+            raise HTTPException(status_code=501, detail="Operation reloading is unavailable")
+        try:
+            registry.replace(reload_extensions())
+        except (ValueError, OSError, ImportError) as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return {"kinds": list(registry.kinds())}
 
     @application.get("/api/projects", response_model=list[str])
     def projects() -> list[str]:
@@ -282,13 +278,13 @@ def create_app(
             raise HTTPException(status_code=422, detail=str(error)) from error
         return Response(content=content, media_type="image/png")
 
-    @application.post("/api/projects/{project_id}/views/{view_id}/helpers/{helper_name}")
-    def invoke_helper_endpoint(project_id: str, view_id: int, helper_name: str, invocation_options: dict | None = None) -> dict:
+    @application.post("/api/projects/{project_id}/views/{view_id}/pipeline/{operation_index}/helpers/{helper_name}")
+    def invoke_helper_endpoint(project_id: str, view_id: int, operation_index: int, helper_name: str, invocation_options: dict | None = None) -> dict:
         try:
             options = invoke_helper.invoke(
                 project_id,
                 view_id,
-                _operation_index(invoke_helper, project_id, view_id, helper_name),
+                operation_index,
                 helper_name,
                 invocation_options or {},
             )

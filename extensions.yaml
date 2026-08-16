@@ -1,0 +1,6 @@
+# Local development registry for independently run extension services.
+# The current in-process loader does not read this file. It becomes active in
+# Phase 1 when HTTP extension discovery replaces that loader.
+sources:
+  - discovery_url: http://127.0.0.1:9101/operations
+    render_timeout_seconds: 300

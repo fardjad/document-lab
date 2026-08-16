@@ -1,25 +1,28 @@
 import unittest
 
 from infrastructure.image_processor.operation_registry import OperationRegistryImpl
-from infrastructure.image_processor.operations.rotate import RotateOperation
-from infrastructure.image_processor.operations.straighten import StraightenOperation
-from infrastructure.image_processor.operations.trim import TrimOperation
+
+
+class Operation:
+    def __init__(self, kind):
+        self.kind = kind
 
 
 class OperationRegistryImplTests(unittest.TestCase):
     def test_get_returns_registered_executor(self) -> None:
-        registry = OperationRegistryImpl([RotateOperation(), StraightenOperation(), TrimOperation()])
-        self.assertIsInstance(registry.get("rotate"), RotateOperation)
-        self.assertIsInstance(registry.get("straighten"), StraightenOperation)
-        self.assertIsInstance(registry.get("trim"), TrimOperation)
+        operations = [Operation("rotate"), Operation("straighten"), Operation("trim")]
+        registry = OperationRegistryImpl(operations)
+        self.assertIs(registry.get("rotate"), operations[0])
+        self.assertIs(registry.get("straighten"), operations[1])
+        self.assertIs(registry.get("trim"), operations[2])
 
     def test_get_unknown_kind_raises(self) -> None:
-        registry = OperationRegistryImpl([RotateOperation()])
+        registry = OperationRegistryImpl([Operation("rotate")])
         with self.assertRaisesRegex(ValueError, "Unknown operation kind"):
             registry.get("nonexistent")
 
     def test_kinds_returns_all_registered(self) -> None:
-        registry = OperationRegistryImpl([RotateOperation(), StraightenOperation(), TrimOperation()])
+        registry = OperationRegistryImpl([Operation("rotate"), Operation("straighten"), Operation("trim")])
         self.assertEqual(("rotate", "straighten", "trim"), registry.kinds())
 
     def test_empty_registry_returns_empty_tuple(self) -> None:

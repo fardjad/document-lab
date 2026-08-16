@@ -17,13 +17,10 @@ try:
     from .infrastructure.file_store.render_cache import FileRenderCache
     from .infrastructure.http_api import create_app
     from .infrastructure.image_processor.opencv_view_analyzer import OpenCVDocumentAnalyzer
-    from .infrastructure.image_processor.operations.remove_background import RemoveBackgroundOperation
-    from .infrastructure.image_processor.operations.rotate import RotateOperation
-    from .infrastructure.image_processor.operations.straighten import StraightenOperation
-    from .infrastructure.image_processor.operations.trim import TrimOperation
+    from .infrastructure.image_processor.extension_loader import ExtensionDependencies, OperationExtensionLoader
     from .infrastructure.image_processor.operation_registry import OperationRegistryImpl
-    from .infrastructure.image_processor.operations.crop import CropOperation
     from .infrastructure.image_processor.rembg_background_remover import RembgBackgroundRemover
+    from .infrastructure.image_processor.http_extension import HttpExtensionDiscovery
 except ImportError:
     from application.view.usecases.invoke_helper import InvokeHelper
     from application.project.usecases.create_project import CreateProject
@@ -43,13 +40,10 @@ except ImportError:
     from infrastructure.file_store.render_cache import FileRenderCache
     from infrastructure.http_api import create_app
     from infrastructure.image_processor.opencv_view_analyzer import OpenCVDocumentAnalyzer
-    from infrastructure.image_processor.operations.remove_background import RemoveBackgroundOperation
-    from infrastructure.image_processor.operations.rotate import RotateOperation
-    from infrastructure.image_processor.operations.straighten import StraightenOperation
-    from infrastructure.image_processor.operations.trim import TrimOperation
+    from infrastructure.image_processor.extension_loader import ExtensionDependencies, OperationExtensionLoader
     from infrastructure.image_processor.operation_registry import OperationRegistryImpl
-    from infrastructure.image_processor.operations.crop import CropOperation
     from infrastructure.image_processor.rembg_background_remover import RembgBackgroundRemover
+    from infrastructure.image_processor.http_extension import HttpExtensionDiscovery
 
 
 settings = Settings.from_environment()
@@ -57,15 +51,10 @@ store = FilesystemProjectStore(settings.project_root)
 cache = FileRenderCache(settings.project_root, settings.cache_ttl_seconds)
 background_remover = RembgBackgroundRemover()
 analyzer = OpenCVDocumentAnalyzer()
-straighten = StraightenOperation(analyzer)
-trim = TrimOperation(analyzer)
-registry = OperationRegistryImpl([
-    RotateOperation(),
-    straighten,
-    trim,
-    CropOperation(),
-    RemoveBackgroundOperation(background_remover),
-])
+extension_loader = OperationExtensionLoader(settings.extension_root, ExtensionDependencies(document_analyzer=analyzer, background_remover=background_remover))
+discovery = HttpExtensionDiscovery(settings.extensions_registry_path) if settings.extensions_registry_path else None
+active_loader = discovery if discovery is not None else extension_loader
+registry = OperationRegistryImpl(active_loader.load())
 for project_id in store.list_project_ids():
     cache.cleanup(project_id)
 list_projects = ListProjects(store)
@@ -86,4 +75,9 @@ app = create_app(
     InvokeHelper(store, read_project_image, read_project_image_size, registry),
     registry,
     RenameProject(store, store),
+    active_loader.load,
 )
+
+if discovery is not None:
+    import signal
+    signal.signal(signal.SIGHUP, lambda *_: registry.replace(discovery.load()))

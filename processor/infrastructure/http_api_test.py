@@ -2,6 +2,10 @@ from io import BytesIO
 from pathlib import Path
 import tempfile
 import unittest
+import json
+import re
+
+import httpx
 
 from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
@@ -23,16 +27,52 @@ from application.view.usecases.render_view import RenderView
 from infrastructure.file_store.filesystem_project_source import FilesystemProjectStore
 from infrastructure.image_processor.opencv_view_analyzer import OpenCVDocumentAnalyzer
 from infrastructure.image_processor.operation_registry import OperationRegistryImpl
-from infrastructure.image_processor.operations.remove_background import RemoveBackgroundOperation
-from infrastructure.image_processor.operations.rotate import RotateOperation
-from infrastructure.image_processor.operations.straighten import StraightenOperation
-from infrastructure.image_processor.operations.trim import TrimOperation
-from infrastructure.image_processor.operations.crop import CropOperation
+from config.extension_registry import ExtensionRegistryConfig
+from infrastructure.image_processor.http_extension import HttpExtensionDiscovery
 
 
 class PassthroughRemover:
     def remove(self, image: bytes, settings) -> bytes:
         return image
+
+
+def extension_transport(request: httpx.Request) -> httpx.Response:
+    if request.url.path == "/health":
+        return httpx.Response(200)
+    if request.url.path == "/operations":
+        operations = []
+        for kind in ("crop", "rotate", "straighten", "trim", "remove_background"):
+            helpers = []
+            if kind in ("straighten", "trim"):
+                helper = "auto_straighten" if kind == "straighten" else "auto_trim"
+                helpers = [{"name": helper, "schema_url": f"/operations/{kind}/helpers/{helper}/schema.json", "invoke_url": f"/operations/{kind}/helpers/{helper}/invoke"}]
+            operations.append({"kind": kind, "schema_url": f"/operations/{kind}/schema.json", "render_url": f"/operations/{kind}/render", "helpers": helpers})
+        return httpx.Response(200, json={"operations": operations})
+    if request.url.path.endswith("/helpers/auto_straighten/schema.json") or request.url.path.endswith("/helpers/auto_trim/schema.json"):
+        return httpx.Response(200, json={"type": "object", "properties": {}, "required": [], "x-hint-require-image": True})
+    if request.url.path.endswith("schema.json"):
+        kind = request.url.path.split("/")[2]
+        properties = {"degrees": {"type": "integer", "multipleOf": 90, "default": 0}} if kind == "rotate" else {"angle": {"type": "number", "default": 0.0}} if kind == "straighten" else {edge: {"type": "integer", "default": 0} for edge in ("top", "right", "bottom", "left")} if kind == "trim" else {"x": {"type": "number", "default": 0}, "y": {"type": "number", "default": 0}, "width": {"type": "number", "default": 1}, "height": {"type": "number", "default": 1}} if kind == "crop" else {"model": {"type": "string", "enum": ["birefnet-general", "u2net"], "default": "birefnet-general"}}
+        return httpx.Response(200, json={"type": "object", "properties": properties, "required": list(properties), "x-hint-require-image": True})
+    if request.url.path.endswith("/render"):
+        match = re.search(rb'"options"\r?\n\r?\n(\{.*?\})', request.content, re.S)
+        options = json.loads(match.group(1)) if match else {}
+        width, height = 120, 90
+        if request.url.path.endswith("/crop/render"):
+            width, height = round(width * options.get("width", 1)), round(height * options.get("height", 1))
+        if request.url.path.endswith("/rotate/render") and options.get("degrees", 0) % 180:
+            width, height = 50, 60
+        if request.url.path.endswith("/trim/render") and options.get("top", 0) >= 90:
+            return httpx.Response(422, json={"detail": "Region trim removes entire output"})
+        image = Image.new("RGBA", (width, height), "white")
+        output = BytesIO()
+        image.save(output, "PNG")
+        return httpx.Response(200, content=output.getvalue(), headers={"content-type": "image/png", "x-image-width": str(width), "x-image-height": str(height)})
+    if "/helpers/" in request.url.path:
+        if request.url.path.endswith("auto_straighten/invoke"):
+            return httpx.Response(200, json={"options": {"angle": 0.1}})
+        return httpx.Response(200, json={"options": {"top": 0, "right": 0, "bottom": 0, "left": 0}})
+    return httpx.Response(404)
 
 
 def png() -> bytes:
@@ -55,8 +95,15 @@ class HttpApiIntegrationTests(unittest.TestCase):
         reader = ReadProjectImage(store)
         sizes = ReadProjectImageSize(store)
         analyzer = OpenCVDocumentAnalyzer()
-        registry = OperationRegistryImpl([RotateOperation(), StraightenOperation(analyzer), TrimOperation(analyzer), CropOperation(), RemoveBackgroundOperation(PassthroughRemover())])
-        self.client = TestClient(create_app(ListProjects(store), reader, ["http://test"], CreateProject(store, store), UpdateProject(store, store), DeleteProject(store, store), ListViews(store), CreateView(store), UpdateView(store, registry), DeleteView(store), RenderView(store, reader, sizes, registry), InvokeHelper(store, reader, sizes, registry), rename_project=RenameProject(store, store)))
+        registry_path = root / "extensions.yaml"
+        registry_path.write_text("sources:\n  - discovery_url: http://extension.test/operations\n")
+        discovery = HttpExtensionDiscovery(registry_path, httpx.Client(transport=httpx.MockTransport(extension_transport)))
+        registry = OperationRegistryImpl(discovery.load())
+        self.client = TestClient(create_app(ListProjects(store), reader, ["http://test"], CreateProject(store, store), UpdateProject(store, store), DeleteProject(store, store), ListViews(store), CreateView(store), UpdateView(store, registry), DeleteView(store), RenderView(store, reader, sizes, registry), InvokeHelper(store, reader, sizes, registry), registry, rename_project=RenameProject(store, store)))
+
+    def test_reload_operations_replaces_registry_contents(self) -> None:
+        reloaded = self.client.post("/api/operations/reload")
+        self.assertEqual(501, reloaded.status_code)
 
     def test_project_lifecycle_end_to_end(self) -> None:
         created = self.client.post("/api/projects", files={"image": ("scan.png", png(), "image/png")})
@@ -122,6 +169,11 @@ class HttpApiIntegrationTests(unittest.TestCase):
         self.assertEqual(422, oversize.status_code)
 
     def test_auto_straighten_and_trim_suggestions(self) -> None:
+        catalog = {item["kind"]: item for item in self.client.get("/api/operations").json()}
+        self.assertEqual(["birefnet-general", "u2net"], catalog["remove_background"]["schema"]["model"].get("enum"))
+        self.assertEqual({"auto_straighten"}, {helper["name"] for helper in catalog["straighten"]["helpers"]})
+        self.assertEqual({"auto_trim"}, {helper["name"] for helper in catalog["trim"]["helpers"]})
+        self.assertEqual({}, catalog["trim"]["helpers"][0]["schema"])
         source = Image.new("RGB", (160, 100), "white")
         ImageDraw.Draw(source).rectangle((40, 30, 119, 69), fill="black")
         source = source.rotate(6, fillcolor="white")
@@ -129,13 +181,15 @@ class HttpApiIntegrationTests(unittest.TestCase):
         source.save(output, "PNG")
         self.client.post("/api/projects", files={"image": ("scan.png", output.getvalue(), "image/png")})
         self.client.post("/api/projects/scan/views", json={"name": "Card"})
-        straighten = self.client.post("/api/projects/scan/views/1/helpers/auto_straighten")
+        self.client.put("/api/projects/scan/views/1", json={"name": "Card", "pipeline": [{"kind": "straighten", "options": {"angle": 0}}, {"kind": "trim", "options": {"top": 0, "right": 0, "bottom": 0, "left": 0}}]})
+        straighten = self.client.post("/api/projects/scan/views/1/pipeline/0/helpers/auto_straighten")
         self.assertEqual(200, straighten.status_code)
         self.assertIsInstance(straighten.json()["options"]["angle"], float)
-        trim = self.client.post("/api/projects/scan/views/1/helpers/auto_trim")
+        trim = self.client.post("/api/projects/scan/views/1/pipeline/1/helpers/auto_trim")
         self.assertEqual(200, trim.status_code)
         self.assertEqual({"top", "right", "bottom", "left"}, set(trim.json()["options"]))
-        self.assertEqual(404, self.client.post("/api/projects/scan/views/9/helpers/auto_trim").status_code)
+        self.assertEqual(404, self.client.post("/api/projects/scan/views/9/pipeline/1/helpers/auto_trim").status_code)
+        self.assertEqual(422, self.client.post("/api/projects/scan/views/1/pipeline/0/helpers/auto_trim").status_code)
 
     def test_non_png_upload_rejected(self) -> None:
         response = self.client.post("/api/projects", files={"image": ("scan.jpg", b"\xff\xd8\xff\xe0", "image/jpeg")})

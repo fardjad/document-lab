@@ -12,6 +12,10 @@ class OperationRegistryImpl:
     def __init__(self, operations, specs=None) -> None:
         self._operations = {operation.kind: operation for operation in operations}
 
+    def replace(self, operations) -> None:
+        """Atomically replace registered operations after an extension reload."""
+        self._operations = {operation.kind: operation for operation in operations}
+
     def get(self, kind: str) -> Operation:
         operation = self._operations.get(kind)
         if operation is None:

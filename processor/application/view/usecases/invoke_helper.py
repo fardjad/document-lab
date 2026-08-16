@@ -38,10 +38,10 @@ class InvokeHelper:
         operations = selected.pipeline.operations
         if not isinstance(operation_index, int) or isinstance(operation_index, bool):
             raise ValueError("Invalid operation index")
-        if operation_index < 0 or operation_index > len(operations):
+        if operation_index < 0 or operation_index >= len(operations):
             raise ValueError("Operation index out of range")
-        target_operation = operations[operation_index] if operation_index < len(operations) else None
-        if target_operation is not None and not target_operation.enabled:
+        target_operation = operations[operation_index]
+        if not target_operation.enabled:
             raise ValueError("Cannot invoke helper for disabled operation")
 
         image = self.image_reader.read(raw_project_id)
@@ -52,22 +52,11 @@ class InvokeHelper:
                 continue
             rendered = self.registry.get(operation.kind).render(rendered, operation.options)
 
-        if target_operation is not None:
-            registered = self.registry.get(target_operation.kind)
-        else:
-            registered = next(
-                (
-                    self.registry.get(kind)
-                    for kind in self.registry.kinds()
-                    if any(helper.name == helper_name for helper in self.registry.get(kind).helpers)
-                ),
-                None,
-            )
-            if registered is None:
-                raise ValueError(f"Unknown helper: {helper_name}")
+        registered = self.registry.get(target_operation.kind)
         try:
             helper = next(helper for helper in registered.helpers if helper.name == helper_name)
         except StopIteration as error:
             raise ValueError(f"Unknown helper: {helper_name}") from error
         validated_options = helper.invocation_spec.validate_options(invocation_options)
-        return helper.invoke(rendered, validated_options, target_operation.options if target_operation is not None else {})
+        current_options = target_operation.options
+        return helper.invoke(rendered, validated_options, current_options)
