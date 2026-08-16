@@ -11,10 +11,14 @@ dependencies = [
     "rembg[cpu]>=2.0.60",
 ]
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
 [tool.fastapi]
 entrypoint = "main:app"
 
 [dependency-groups]
 dev = [
     "httpx2>=2.0.0",
+    "pytest>=9.1.1",
 ]
