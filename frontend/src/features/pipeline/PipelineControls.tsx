@@ -196,8 +196,9 @@ export function Parameters({
               label={label}
               value={value}
               onChange={(e) => {
-                setDraft({ ...draft, [key]: Number(e.target.value) });
-                onDraftChange({ ...draft, [key]: Number(e.target.value) });
+                const next = { ...draft, [key]: Number(e.target.value) };
+                setDraft(next);
+                onDraftChange(next);
               }}
               slotProps={{ htmlInput: { min: schema.min, max: schema.max, step } }}
               helperText={schema.description}

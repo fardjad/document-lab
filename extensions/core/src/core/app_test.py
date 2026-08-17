@@ -71,9 +71,18 @@ def test_crop_validates_rectangle_and_renders_dimensions() -> None:
     assert response.status_code == 200
     assert (response.headers["x-image-width"], response.headers["x-image-height"]) == ("50", "75")
 
+    response = _render("crop", {"x": 0.25, "y": 0.1, "width": 1, "height": 1}, _rgba_png((100, 100)))
+    assert (response.headers["x-image-width"], response.headers["x-image-height"]) == ("75", "90")
+
     invalid = _render("crop", {"x": -0.1, "y": 0, "width": 1, "height": 1}, _png())
     assert invalid.status_code == 422
     assert invalid.json()["detail"]["code"] == "invalid_options"
+
+
+def test_crop_boundary_normalized_values_render_non_empty_output() -> None:
+    response = _render("crop", {"x": 0.999, "y": 0.999, "width": 1, "height": 1}, _rgba_png((100, 100)))
+    assert response.status_code == 200
+    assert (response.headers["x-image-width"], response.headers["x-image-height"]) == ("1", "1")
 
 
 def test_crop_rejects_non_finite_and_non_real_values() -> None:

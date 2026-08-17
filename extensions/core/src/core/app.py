@@ -30,8 +30,8 @@ def validate_crop(o):
     vals = tuple(o.get(k) for k in ("x", "y", "width", "height"))
     if any(isinstance(v, bool) or not isinstance(v, Real) or not math.isfinite(v) for v in vals): raise ValueError("Invalid crop rectangle")
     x, y, w, h = vals
-    if x < 0 or y < 0 or w <= 0 or h <= 0 or x + w > 1 or y + h > 1: raise ValueError("Invalid crop rectangle")
-    return dict(zip(("x", "y", "width", "height"), vals))
+    if x < 0 or y < 0 or x >= 1 or y >= 1 or w <= 0 or h <= 0 or w > 1 or h > 1: raise ValueError("Invalid crop rectangle")
+    return {"x": x, "y": y, "width": min(w, 1 - x), "height": min(h, 1 - y)}
 
 
 def validate_rotate(o):
@@ -144,7 +144,12 @@ def _straighten_angle(image):
 def _operation(kind, data, options):
     image = _image(data)
     if kind == "crop":
-        x,y,w,h = (options[k] for k in ("x","y","width","height")); return image.crop((round(x*image.width), round(y*image.height), round((x+w)*image.width), round((y+h)*image.height)))
+        x,y,w,h = (options[k] for k in ("x","y","width","height"))
+        left = min(image.width - 1, round(x * image.width))
+        top = min(image.height - 1, round(y * image.height))
+        right = min(image.width, max(left + 1, round((x + w) * image.width)))
+        bottom = min(image.height, max(top + 1, round((y + h) * image.height)))
+        return image.crop((left, top, right, bottom))
     if kind == "rotate":
         degrees = options["degrees"]
         return image if degrees == 0 else image.transpose({90:Image.Transpose.ROTATE_270,180:Image.Transpose.ROTATE_180,270:Image.Transpose.ROTATE_90}[degrees])

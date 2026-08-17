@@ -42,19 +42,6 @@ export function Preview({
       const enabledPipeline = pipeline
         .filter((o) => o.enabled !== false)
         .map(({ kind, options }) => ({ kind, options }));
-      const crop = enabledPipeline.find((operation) => operation.kind === "crop");
-      if (
-        crop &&
-        (!isNormalizedRectangle(crop.options.x) ||
-          !isNormalizedRectangle(crop.options.y) ||
-          !isNormalizedRectangle(crop.options.width) ||
-          !isNormalizedRectangle(crop.options.height) ||
-          Number(crop.options.x) + Number(crop.options.width) > 1 ||
-          Number(crop.options.y) + Number(crop.options.height) > 1)
-      ) {
-        setPreview("");
-        return;
-      }
       trackedFetch(
         `${API}/projects/${encodeURIComponent(project.id)}/views/${view.id}/render`,
         {
@@ -290,8 +277,4 @@ export function Preview({
       </Box>
     </Box>
   );
-}
-
-function isNormalizedRectangle(value: unknown) {
-  return typeof value === "number" && value >= 0 && value <= 1;
 }
