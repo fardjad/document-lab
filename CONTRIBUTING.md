@@ -15,6 +15,15 @@ cd ../../frontend
 bun install
 ```
 
+On macOS, install `util-linux` and expose its `setsid` command before running the integrated development command:
+
+```bash
+brew install util-linux
+export PATH="$(brew --prefix util-linux)/bin:$PATH"
+```
+
+Add the `export` command to your shell profile to make it persistent.
+
 From the repository root, the supported integrated development command is:
 
 ```bash
