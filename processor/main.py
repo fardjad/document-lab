@@ -72,7 +72,7 @@ app = create_app(
     UpdateView(store, registry, cache),
     DeleteView(store, cache),
     RenderView(store, read_project_image, read_project_image_size, registry, cache),
-    InvokeHelper(store, read_project_image, read_project_image_size, registry),
+    InvokeHelper(store, read_project_image, read_project_image_size, registry, cache),
     registry,
     RenameProject(store, store),
     active_loader.load,

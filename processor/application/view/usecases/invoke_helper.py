@@ -2,15 +2,19 @@ from dataclasses import dataclass
 
 try:
     from application.view.ports.operation_registry import OperationRegistry
+    from application.view.ports.render_cache import RenderCache
     from application.view.ports.rendered_region import RenderedRegion
     from application.view.ports.view_store import ProjectViewStore
     from application.view.usecases.project_lookup import project_id_or_not_found
+    from application.view.usecases.render_view import cache_key_for_step
     from model.view import ViewNotFound
 except ImportError:
     from ...view.ports.operation_registry import OperationRegistry
+    from ...view.ports.render_cache import RenderCache
     from ...view.ports.rendered_region import RenderedRegion
     from ...view.ports.view_store import ProjectViewStore
     from ...view.usecases.project_lookup import project_id_or_not_found
+    from ...view.usecases.render_view import cache_key_for_step
     from ....model.view import ViewNotFound
 
 
@@ -22,6 +26,7 @@ class InvokeHelper:
     image_reader: object
     image_sizes: object
     registry: OperationRegistry
+    cache: RenderCache | None = None
 
     def invoke(
         self,
@@ -47,10 +52,17 @@ class InvokeHelper:
         image = self.image_reader.read(raw_project_id)
         width, height = self.image_sizes.read(raw_project_id)
         rendered = RenderedRegion(image.data, width, height)
-        for operation in operations[:operation_index]:
-            if not operation.enabled:
-                continue
-            rendered = self.registry.get(operation.kind).render(rendered, operation.options)
+        cache_key = cache_key_for_step(operations, operation_index - 1) if operation_index > 0 else None
+        cached = self.cache.get(project_id, view_id, cache_key) if self.cache is not None and cache_key is not None else None
+        if cached is not None:
+            rendered = cached
+        else:
+            for operation in operations[:operation_index]:
+                if not operation.enabled:
+                    continue
+                rendered = self.registry.get(operation.kind).render(rendered, operation.options)
+            if self.cache is not None and cache_key is not None:
+                self.cache.put(project_id, view_id, cache_key, rendered)
 
         registered = self.registry.get(target_operation.kind)
         try:

@@ -4,6 +4,7 @@ from application.view.usecases.invoke_helper import InvokeHelper
 from application.view.ports.helper import Helper
 from application.view.ports.operation_spec import OperationSpec
 from application.view.ports.rendered_region import RenderedRegion
+from application.view.usecases.render_view import cache_key_for_step
 from model.pipeline import Pipeline
 from model.project import Project, ProjectId, ProjectImage, ProjectNotFound
 from model.operation import Operation
@@ -49,6 +50,20 @@ class FakeRegistry:
         return (self.operation.kind,)
 
 
+class FakeCache:
+    def __init__(self, cached=None):
+        self.cached = cached
+        self.get_calls = []
+        self.put_calls = []
+
+    def get(self, project_id, view_id, cache_key):
+        self.get_calls.append((project_id, view_id, cache_key))
+        return self.cached
+
+    def put(self, project_id, view_id, cache_key, rendered):
+        self.put_calls.append((project_id, view_id, cache_key, rendered))
+
+
 class InvokeHelperTests(unittest.TestCase):
     def test_validates_invokes_and_returns_updated_options_after_partial_render(self):
         validated = []
@@ -71,6 +86,30 @@ class InvokeHelperTests(unittest.TestCase):
         self.assertEqual(b"source_rendered", calls[0][0].image)
         self.assertEqual({"threshold": 3}, calls[0][1])
         self.assertEqual({"left": 2}, calls[0][2])
+
+    def test_uses_cached_prefix_without_rendering_prior_operations(self):
+        calls = []
+
+        def invoke(rendered, invocation_options, current_options):
+            calls.append(rendered)
+            return current_options
+
+        helper = Helper("auto_trim", OperationSpec("auto_trim", {}, lambda options: options), invoke)
+        operation = FakeOperation(helper)
+        operations = FakeStore().read_project_views(ProjectId("project")).find_view(1).pipeline.operations
+        cached = RenderedRegion(b"cached", 80, 80)
+        cache = FakeCache(cached)
+        usecase = InvokeHelper(FakeStore(), FakeReader(), FakeSizes(), FakeRegistry(operation), cache)
+
+        usecase.invoke("project", 1, 1, "auto_trim", {})
+
+        self.assertEqual([cached], calls)
+        self.assertEqual([], operation.rendered)
+        self.assertEqual(
+            [(ProjectId("project"), 1, cache_key_for_step(operations, 0))],
+            cache.get_calls,
+        )
+        self.assertEqual([], cache.put_calls)
 
     def test_rejects_helpers_that_do_not_belong_to_an_existing_pipeline_operation(self):
         helper = Helper("auto_trim", OperationSpec("auto_trim", {}, lambda options: options), lambda rendered, invocation, current: current)
