@@ -106,6 +106,13 @@ class FilesystemViewsTests(unittest.TestCase):
 
 
 class FilesystemProjectWriterTests(unittest.TestCase):
+    def test_create_project_creates_missing_root(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "missing" / "child"
+            store = FilesystemProjectStore(root)
+            store.create_project(ProjectId("fresh"), ProjectImage(PNG_HEADER))
+            self.assertEqual(PNG_HEADER, (root / "fresh" / "image.png").read_bytes())
+
     def test_create_and_delete_project(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

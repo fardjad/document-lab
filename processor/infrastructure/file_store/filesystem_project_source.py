@@ -85,6 +85,7 @@ class FilesystemProjectStore(ProjectStore, ProjectViewStore, ProjectWriter):
             raise ValueError("Invalid project path")
         if project.exists():
             raise FileExistsError("Project already exists")
+        self._root.mkdir(parents=True, exist_ok=True)
         project.mkdir(parents=False, exist_ok=False)
         try:
             self._atomic_write(project / "image.png", image.data)
